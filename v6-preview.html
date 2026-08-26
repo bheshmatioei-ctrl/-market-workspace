@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Market Workspace V6 Preview</title>
+<style>
+:root{
+ --bg:#0b1220;--panel:#111a2a;--panel2:#0f1724;--line:#243247;--text:#e7edf7;
+ --muted:#8fa1ba;--accent:#2f80ed;--green:#21c58b;--red:#ff5c6c;--yellow:#f4b942;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+body{overflow:hidden}
+button,input{font:inherit}
+.top{height:58px;display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);background:#0d1522;direction:ltr}
+.brand{font-weight:800;margin-right:8px;white-space:nowrap}.badge{font-size:11px;color:#8fc2ff;border:1px solid #315b8d;border-radius:999px;padding:3px 7px}
+.search{flex:1;max-width:520px;background:#0a111c;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 12px}
+.btn{background:#131e2e;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 11px;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent)}
+.shell{height:calc(100% - 58px);display:grid;grid-template-columns:64px 260px minmax(0,1fr) 360px;grid-template-rows:minmax(0,1fr);gap:0}
+.nav{background:#0d1522;border-right:1px solid var(--line);padding:10px 7px;display:flex;flex-direction:column;gap:8px;direction:ltr}
+.nav button{height:46px;border:0;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer}.nav button.active{background:#13213a;color:#9fc5ff}
+.sidebar{background:#0f1724;border-right:1px solid var(--line);padding:10px;overflow:auto;direction:ltr}
+.sidebar h3{font-size:13px;margin:6px 0 10px}.watchitem{display:grid;grid-template-columns:1fr auto;gap:4px;padding:9px;border-radius:8px;border-bottom:1px solid #1e2a3c;cursor:pointer}.watchitem:hover,.watchitem.active{background:#13213a}.sym{font-weight:800}.name{font-size:11px;color:var(--muted)}.price{font-weight:700}.chg.pos{color:var(--green)}.chg.neg{color:var(--red)}
+.main{padding:10px;display:grid;grid-template-rows:minmax(360px,1.8fr) minmax(230px,1fr);gap:10px;overflow:hidden}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+.panelhead{height:42px;display:flex;align-items:center;padding:0 10px;border-bottom:1px solid var(--line);direction:ltr}.panelhead b{font-size:13px}.paneltools{margin-left:auto;display:flex;gap:4px}
+.chart{height:calc(100% - 42px);position:relative;background:
+linear-gradient(#1b2a3f 1px,transparent 1px),
+linear-gradient(90deg,#1b2a3f 1px,transparent 1px);
+background-size:60px 40px;padding:12px;overflow:hidden}
+.chart svg{width:100%;height:100%}
+.lower{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;overflow:hidden}
+.list{padding:10px;overflow:auto;height:calc(100% - 42px);direction:ltr}
+.row{display:grid;grid-template-columns:72px 1fr auto;gap:8px;padding:8px 0;border-bottom:1px solid #1d293b;align-items:start}.small{font-size:11px;color:var(--muted)}
+.ai{background:#0f1724;border-left:1px solid var(--line);padding:10px;display:grid;grid-template-rows:auto auto 1fr auto;gap:10px;overflow:hidden;direction:ltr}
+.aicard{background:#111a2a;border:1px solid var(--line);border-radius:10px;padding:12px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions button{background:#131e2e;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:left}
+.capture{display:flex;align-items:center;justify-content:center;border:1px dashed #38506f;border-radius:10px;color:var(--muted);min-height:160px;text-align:center;padding:18px}
+.chatbar{display:flex;gap:8px}.chatbar input{flex:1;background:#0b1220;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px}
+.footer{position:fixed;left:64px;right:0;bottom:0;height:38px;border-top:1px solid var(--line);background:#0d1522;display:flex;align-items:center;padding:0 12px;gap:16px;direction:ltr;font-size:12px}.footer .status{margin-left:auto;color:var(--green)}
+@media(max-width:1100px){
+ .shell{grid-template-columns:56px 210px minmax(0,1fr)}
+ .ai{display:none}
+}
+@media(max-width:760px){
+ body{overflow:auto}.top{position:sticky;top:0;z-index:5}.shell{height:auto;display:block}.nav{display:none}.sidebar{border-right:0;border-bottom:1px solid var(--line);white-space:nowrap}.watchitem{display:inline-grid;width:150px;margin-right:6px}.main{display:block;overflow:visible}.panel{margin-bottom:10px}.lower{display:block}.lower .panel{height:240px}.footer{display:none}
+}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="brand">Market Workspace <span class="badge">V6 Preview</span></div>
+  <input class="search" id="search" placeholder="Search ticker, company, or keyword...">
+  <button class="btn">Layout</button>
+  <button class="btn">Sync</button>
+  <button class="btn primary" id="captureBtn">Capture</button>
+</div>
+
+<div class="shell">
+  <aside class="nav">
+    <button class="active">Home</button><button>Markets</button><button>Calendar</button><button>News</button><button>Notes</button><button>AI</button>
+  </aside>
+
+  <aside class="sidebar">
+    <h3>WATCHLIST</h3>
+    <div id="watch"></div>
+  </aside>
+
+  <main class="main">
+    <section class="panel">
+      <div class="panelhead"><b id="chartTitle">Amazon.com, Inc. · 1D · NASDAQ</b><div class="paneltools"><button class="btn" id="full">Fullscreen</button></div></div>
+      <div class="chart" id="chart">
+        <svg viewBox="0 0 900 500" preserveAspectRatio="none" aria-label="demo chart">
+          <polyline id="line" fill="none" stroke="#21c58b" stroke-width="3" points="0,390 70,370 140,330 210,340 280,240 350,220 420,250 490,320 560,290 630,260 700,310 770,180 840,210 900,190"/>
+          <polyline fill="none" stroke="#2f80ed" stroke-width="1.2" opacity=".35" points="0,410 100,370 220,300 330,280 470,340 600,300 720,250 900,230"/>
+        </svg>
+      </div>
+    </section>
+
+    <div class="lower">
+      <section class="panel">
+        <div class="panelhead"><b>Economic Calendar</b></div>
+        <div class="list">
+          <div class="row"><span>08:00</span><div>GDP (QoQ) Q2<div class="small">Germany</div></div><span class="chg neg">High</span></div>
+          <div class="row"><span>08:00</span><div>Core PCE Price Index<div class="small">United States</div></div><span class="chg neg">High</span></div>
+          <div class="row"><span>10:30</span><div>EIA Crude Oil Inventories<div class="small">United States</div></div><span class="chg pos">Med</span></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panelhead"><b>Financial News</b></div>
+        <div class="list" id="news">
+          <div class="row"><span>10m</span><div>Amazon stock slips as AWS growth misses estimates<div class="small">Reuters</div></div><span>AMZN</span></div>
+          <div class="row"><span>1h</span><div>Amazon expands AI infrastructure spending<div class="small">Bloomberg</div></div><span>AMZN</span></div>
+          <div class="row"><span>2h</span><div>Consumer spending remains resilient<div class="small">CNBC</div></div><span>Macro</span></div>
+        </div>
+      </section>
+      <section class="panel">
+        <div class="panelhead"><b>YouTube / Media</b></div>
+        <div class="list">
+          <div class="row"><span>12:45</span><div>Amazon Stock Analysis — What’s Next?<div class="small">Suggested</div></div><span>▶</span></div>
+          <div class="row"><span>18:32</span><div>AWS re:Invent Highlights<div class="small">Saved</div></div><span>▶</span></div>
+          <div class="row"><span>09:15</span><div>Amazon Business Model Explained<div class="small">Research</div></div><span>▶</span></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="ai">
+    <div class="aicard"><b>Market AI Assistant</b><div class="small" id="aiTicker">Context: AMZN</div></div>
+    <div class="actions">
+      <button id="analyze">Analyze ticker</button><button>Market summary</button><button>Explain news</button><button>Screen stocks</button>
+    </div>
+    <div class="capture" id="captureBox">Capture anything on screen<br>and send it here for analysis</div>
+    <div class="chatbar"><input placeholder="Ask anything about markets..."><button class="btn primary">Send</button></div>
+  </aside>
+</div>
+
+<div class="footer">
+  <span>NOTES</span><span>CAPTURE TRAY (3)</span><span>RECENT ITEMS</span><span class="status">● All changes saved</span>
+</div>
+
+<script>
+const data=[
+ ['AMZN','Amazon.com, Inc.','261.06','-0.39%','neg'],
+ ['NVDA','NVIDIA Corporation','126.63','+1.68%','pos'],
+ ['AAPL','Apple Inc.','223.19','+0.19%','pos'],
+ ['MSFT','Microsoft Corp.','416.80','+0.38%','pos'],
+ ['GOOGL','Alphabet Inc.','165.98','+0.75%','pos'],
+ ['META','Meta Platforms','517.91','+0.16%','pos'],
+ ['TSLA','Tesla Inc.','214.16','-0.86%','neg'],
+ ['NFLX','Netflix, Inc.','695.18','+0.51%','pos'],
+ ['JPM','JPMorgan Chase','198.64','-0.12%','neg'],
+ ['XOM','Exxon Mobil','108.43','+0.27%','pos']
+];
+const watch=document.getElementById('watch');
+data.forEach((d,i)=>{
+ const el=document.createElement('div');el.className='watchitem'+(i===0?' active':'');el.innerHTML=`<div><div class="sym">${d[0]}</div><div class="name">${d[1]}</div></div><div><div class="price">${d[2]}</div><div class="chg ${d[4]}">${d[3]}</div></div>`;
+ el.onclick=()=>select(d,el);watch.appendChild(el)
+});
+function select(d,el){
+ document.querySelectorAll('.watchitem').forEach(x=>x.classList.remove('active'));el.classList.add('active');
+ document.getElementById('chartTitle').textContent=`${d[1]} · 1D · NASDAQ`;
+ document.getElementById('aiTicker').textContent=`Context: ${d[0]}`;
+ document.getElementById('news').firstElementChild.querySelector('span:last-child').textContent=d[0];
+}
+document.getElementById('captureBtn').onclick=()=>{
+ document.getElementById('captureBox').textContent='Capture mode active — drag to select a region';
+ document.getElementById('captureBox').style.borderColor='#2f80ed';
+};
+document.getElementById('analyze').onclick=()=>alert('Preview: this button would send the selected ticker + context to the AI panel.');
+document.getElementById('full').onclick=()=>{
+ const p=document.querySelector('.main > .panel');
+ if(!document.fullscreenElement){p.requestFullscreen?.()}else{document.exitFullscreen?.()}
+};
+document.getElementById('search').addEventListener('input',e=>{
+ const q=e.target.value.toLowerCase();
+ [...document.querySelectorAll('.watchitem')].forEach((el,i)=>el.style.display=(data[i][0].toLowerCase().includes(q)||data[i][1].toLowerCase().includes(q))?'grid':'none')
+});
+</script>
+</body>
+</html>
