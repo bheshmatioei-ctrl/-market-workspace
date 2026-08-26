@@ -1,0 +1,11 @@
+{
+  "name": "Market Research Workspace",
+  "short_name": "Market Workspace",
+  "description": "Local-first cross-platform market research, notes, capture and AI workspace.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef3f8",
+  "theme_color": "#1769e0",
+  "orientation": "any"
+}
