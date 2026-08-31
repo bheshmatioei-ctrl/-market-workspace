@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Decision Cockpit — Foundation Mock Shell</title>
+  <link rel="stylesheet" href="./src/decision-cockpit/ui/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">Market Decision Intelligence System</p>
+      <h1>Decision Cockpit</h1>
+    </div>
+    <div id="mode-banner" class="mode-banner" role="status"></div>
+  </header>
+
+  <nav class="top-nav" aria-label="Decision Cockpit views">
+    <button type="button" class="nav-item is-active" data-view="live-market">LIVE MARKET</button>
+    <button type="button" class="nav-item" data-view="premarket">PREMARKET</button>
+    <button type="button" class="nav-item" data-view="global-flow">GLOBAL FLOW</button>
+    <button type="button" class="nav-item" data-view="model-test">MODEL TEST</button>
+  </nav>
+
+  <main id="cockpit-root" aria-live="polite"></main>
+  <noscript>This architecture-validation shell requires JavaScript to render local mock fixtures.</noscript>
+  <script type="module" src="./src/decision-cockpit/ui/render-shell.js"></script>
+</body>
+</html>
+

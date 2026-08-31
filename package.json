@@ -1,0 +1,13 @@
+{
+  "name": "market-decision-cockpit-foundation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/decision-cockpit/tests/*.test.js",
+    "test:architecture": "node src/decision-cockpit/validation/architecture-guard.js",
+    "build": "node scripts/build.mjs",
+    "check": "npm run test && npm run test:architecture && npm run build"
+  }
+}
+

@@ -1,0 +1,24 @@
+{
+  "index.html": "ab7710a02fbc561916cac81193516f7288597243469fbcc16c61390310453692",
+  "app-config.js": "ed6cb33b4f575607a1f1a8cc958ed4f512fb1178a6535eadff6ca42b95ceced4",
+  "sw.js": "9cc2396aec80b476cae37fb013b623d0b88e553c8132b4de62bb795853083943",
+  "manifest.webmanifest": "74b1377cff0fb6c522c0c22e54068477732ba98e9c83275a4dcad8122a681e4c",
+  "v6-preview.html": "befd491a8b7625b5380f414edc4b48c5f1bda851226fc463f1764c40a1bbb0b5",
+  "v6-workspace.html": "831c04ee172a314d885ab312abd39f395b6c315711f87c5b725b54b219914fc2",
+  "v6/index.html": "b9cd281c6e83bf9d4ab160f3fbf2ec9a74abb498268be0b119fbdece05cd608b",
+  "v7/ai-sidepanel-v7.js": "1c3ae2b5759dfc1be7a68cace5886ea6e7a4cbcbd0b1657156f0f76a01273e47",
+  "v7/app-v7.js": "e8041faa780ed3d8f58b41560b0d5a7d74e59ec1922b06b9a7469b15ee1403a3",
+  "v7/capture-workflow-v7.css": "911615631f0de819d1735ba9cbb7970bbf84511b60e60280e4ba3f7fcc6e73e5",
+  "v7/capture-workflow-v7.js": "e5d440e90a72695d6cbf325780e34e1f9c6d4535a6a6e72e8fbdcc2011759851",
+  "v7/icon.svg": "ad57785fff40406986d593735723d5638b03b1cd0b08ffdb19b044a3d6af9aa8",
+  "v7/index.html": "2297316006c0f3065aab2915f1271e4d12c23c52dcb3733b8abc110ba867ca7c",
+  "v7/manifest.webmanifest": "3ac90b284293aab80d7b6cb370623ab3debc4b52fda9e3dd10db365bb9d37f67",
+  "v7/media-live-v7.css": "9ada4d50c9c8aedcdf81deaec3a13d7090b3fa1df734bfe011067c50aa5f722d",
+  "v7/media-live-v7.js": "aafe334c24b45c40cacfe40ea003a85f9b41ac7ea1ae26bafb449fd07bb23c1d",
+  "v7/qa-fixes-v7.js": "7bffcf4f688d69c57a3f3f4b08914e8e91f94c8f17c07e225567efb808655f1c",
+  "v7/stabilize-v7.css": "1e700c122ec4c47c23ad23c06db2ec8c4dc3fa0183b47a40bb27eb8d8f631f17",
+  "v7/stabilize-v7.js": "3b4c1b42240b81120b0d9a4d3acc63f44fc11fe3dbb4fdb42576233d5c083104",
+  "v7/styles-v7.css": "e5fa991c13169fbfe34ed9775e300469e7ef7949c4fd70efe9209178f9246716",
+  "v7/sw.js": "39ca14f061219a38ef9ca7cfa2ee5c272f2734c7b6dea5f463b597b246ba1f6a"
+}
+
