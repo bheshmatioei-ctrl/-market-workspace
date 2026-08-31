@@ -12,6 +12,28 @@
   const aiBtn = document.getElementById('aiPanelBtn');
   if (aiBtn) aiBtn.querySelector('span').textContent = 'Research';
 
+  function displayContext() {
+    const section = S.context.activeSection;
+    if (section === 'youtube') {
+      const tab = activeTab('youtube');
+      return {
+        sectionLabel: 'Live / Media',
+        sourceLabel: tab === 'Bloomberg HT Live' ? 'Bloomberg HT · Live HLS' : tab === 'YouTube' ? 'YouTube' : 'Live / Media',
+        badge: tab === 'Bloomberg HT Live' ? 'BLOOMBERG HT' : String(tab || 'MEDIA').toUpperCase()
+      };
+    }
+    if (section === 'market') {
+      const tab = activeTab('market');
+      return {sectionLabel:'Market', sourceLabel:tab || S.context.activeSource || 'Market', badge:String(tab || 'MARKET').toUpperCase()};
+    }
+    if (section === 'news') return {sectionLabel:'News', sourceLabel:activeTab('news') || 'News', badge:'NEWS'};
+    if (section === 'calendar') return {sectionLabel:'Economic Calendar', sourceLabel:'TradingView Economic Calendar', badge:'CALENDAR'};
+    if (section === 'watchlist') return {sectionLabel:'Watchlist', sourceLabel:activeTab('watchlist') || 'Watchlist', badge:'WATCHLIST'};
+    if (section === 'notebook') return {sectionLabel:'Notebook', sourceLabel:activeTab('notebook') || 'Notebook', badge:'NOTEBOOK'};
+    if (section === 'research') return {sectionLabel:'Research / Filings', sourceLabel:activeTab('research') || 'Research', badge:'RESEARCH'};
+    return {sectionLabel:section || 'Workspace', sourceLabel:S.context.activeSource || 'Workspace', badge:String(section || 'WORKSPACE').toUpperCase()};
+  }
+
   function captureSummary() {
     const c = S.context.activeCapture || (S.captures && S.captures.length ? S.captures[S.captures.length - 1] : null);
     if (!c) return '<div class="researchEmpty">No capture attached yet.</div>';
@@ -21,10 +43,10 @@
   function contextPrompt() {
     const t = S.context.activeTicker;
     const c = S.context.activeCompany;
-    const source = S.context.activeSource || 'Workspace';
+    const view = displayContext();
     const note = (S.notes || '').trim();
     const cap = S.context.activeCapture || null;
-    let out = `Market research context\nTicker: ${t}\nCompany: ${c}\nSource: ${source}\nSection: ${S.context.activeSection}\nDate range: ${S.context.activeDateRange || 'n/a'}\n\nTask:\nAnalyze the current context using verified current sources. Separate FACT, INTERPRETATION, UNCERTAINTY and FORECAST.`;
+    let out = `Market research context\nTicker: ${t}\nCompany: ${c}\nSource: ${view.sourceLabel}\nSection: ${view.sectionLabel}\nDate range: ${S.context.activeDateRange || 'n/a'}\n\nTask:\nAnalyze the current context using verified current sources. Separate FACT, INTERPRETATION, UNCERTAINTY and FORECAST.`;
     if (note) out += `\n\nNotebook context:\n${note.slice(0, 2500)}`;
     if (cap) out += `\n\nCapture metadata:\n${JSON.stringify(cap)}`;
     return out;
@@ -34,13 +56,14 @@
     const tab = activeTab('ai');
     const t = S.context.activeTicker;
     const company = S.context.activeCompany;
+    const view = displayContext();
 
     if (tab === 'Prompt') {
       return `<div class="researchPanel">
         <div class="researchHero"><div><div class="researchKicker">PREPARED RESEARCH CONTEXT</div><h2>${esc(t)} · ${esc(company)}</h2></div><span class="sourceBadge">LOCAL ONLY</span></div>
         <textarea id="researchPrompt" class="noteArea researchPrompt">${esc(contextPrompt())}</textarea>
         <div class="researchActions"><button class="btn primary" id="copyResearchPrompt">Copy prompt</button><button class="btn" data-go="notebook">Open Notebook</button><button class="btn" id="researchCaptureBtn">Capture</button></div>
-        <p class="small researchFoot">This panel prepares context only. It does not claim to be connected to the OpenAI API.</p>
+        <div class="researchBlock"><div class="researchBlockHead"><b>ChatGPT inline connection</b><span class="small">Not connected</span></div><div class="researchNotePreview">The panel is intentionally keeping a dedicated ChatGPT integration slot. It will only be enabled when a secure backend is available; no fake connection is shown.</div></div>
       </div>`;
     }
 
@@ -54,16 +77,17 @@
     }
 
     return `<div class="researchPanel">
-      <div class="researchHero"><div><div class="researchKicker">ACTIVE RESEARCH CONTEXT</div><h2>${esc(t)} · ${esc(company)}</h2></div><span class="sourceBadge">${esc(S.context.activeSection).toUpperCase()}</span></div>
+      <div class="researchHero"><div><div class="researchKicker">ACTIVE RESEARCH CONTEXT</div><h2>${esc(t)} · ${esc(company)}</h2></div><span class="sourceBadge">${esc(view.badge)}</span></div>
       <div class="researchContextGrid">
         <div class="researchMetric"><span>Ticker</span><b>${esc(t)}</b></div>
-        <div class="researchMetric"><span>Source</span><b>${esc(S.context.activeSource || 'Workspace')}</b></div>
-        <div class="researchMetric"><span>Range</span><b>${esc(S.context.activeDateRange || '—')}</b></div>
+        <div class="researchMetric"><span>Source</span><b>${esc(view.sourceLabel)}</b></div>
+        <div class="researchMetric"><span>Section</span><b>${esc(view.sectionLabel)}</b></div>
         <div class="researchMetric"><span>Captures</span><b>${(S.captures || []).length}</b></div>
       </div>
       <div class="researchBlock"><div class="researchBlockHead"><b>Latest capture</b><button class="btn" id="researchCaptureBtn">Capture</button></div>${captureSummary()}</div>
       <div class="researchBlock"><div class="researchBlockHead"><b>Quick workflow</b></div><div class="researchActions"><button class="btn" data-go="market">Market</button><button class="btn" data-go="news">News</button><button class="btn" data-go="notebook">Notebook</button><button class="btn primary" id="goPromptTab">Prepare prompt</button></div></div>
       <div class="researchBlock"><div class="researchBlockHead"><b>Notebook</b><span class="small">${(S.notes || '').trim() ? 'Research note available' : 'No note yet'}</span></div><div class="researchNotePreview">${esc((S.notes || '').trim().slice(0, 420) || 'Write a note in Notebook or the Notes tab.')}</div></div>
+      <div class="researchBlock"><div class="researchBlockHead"><b>ChatGPT inline</b><span class="small">Reserved · not connected</span></div><div class="researchNotePreview">This area is reserved for a real in-workspace ChatGPT connection. It stays visible in the architecture so Capture, Notes, ticker and source context can be sent there later without redesigning the workspace.</div></div>
     </div>`;
   };
 
@@ -82,14 +106,24 @@
     if (copyNote) copyNote.onclick = () => copyText(S.notes || '').then(() => toast('Note copied'));
   };
 
+  function syncResearchButton() {
+    const btn = document.getElementById('aiPanelBtn');
+    if (!btn) return;
+    const open = !!S.split && S.splitSecondary === 'ai' && window.innerWidth > 820;
+    btn.querySelector('span').textContent = open ? 'Close Research' : 'Research';
+    btn.setAttribute('aria-label', open ? 'Close Research panel' : 'Open Research panel');
+  }
+
   const baseRender = render;
   render = function renderStabilized() {
     baseRender();
-    const btn = document.getElementById('aiPanelBtn');
-    if (btn) {
-      const open = !!S.split && S.splitSecondary === 'ai' && window.innerWidth > 820;
-      btn.querySelector('span').textContent = open ? 'Close Research' : 'Research';
-    }
+    syncResearchButton();
+  };
+
+  const baseRenderWorkspace = renderWorkspace;
+  renderWorkspace = function renderWorkspaceStabilized() {
+    baseRenderWorkspace();
+    syncResearchButton();
   };
 
   save();
