@@ -80,6 +80,30 @@ export const BUNDLE_RULE_PROFILE = profile({
   engineVersion: "0.2-shadow",
 });
 
+export const ANOMALY_RADAR_RULE_PROFILE = profile({
+  ruleProfileId: "anomaly-radar.experimental.v0.3",
+  version: "0.3.0",
+  description: "Synthetic deterministic anomaly thresholds for Package 003 SHADOW validation only; not empirically validated or production-ready.",
+  engineId: "anomaly-radar-engine",
+  engineVersion: "0.3-shadow",
+  minimumRelativeVolume: 2,
+  gapThresholdPct: 2,
+  abnormalDollarVolumeThreshold: 50_000_000,
+  vwapDistanceThreshold: 0.1,
+  relativeStrengthThreshold: 0.5,
+  breakoutThreshold: 0.5,
+  minimumEvidenceFamilies: 2,
+  conflictMagnitude: 0.5,
+  minimumSectorMovePct: 0.3,
+  minimumStockMovePctForSectorContext: 0.5,
+  minimumPriceMovePctForDivergence: 1,
+  maximumRelativeVolumeForPriceConfirmation: 0.8,
+  maximumPriceResponsePctForVolumeConfirmation: 0.25,
+  minimumReferenceSnapshots: 1,
+  catalystAssociationWindowSeconds: 86_400,
+  severityByAnomalyCount: Object.freeze({ watch: 2, warning: 4, critical: 7 }),
+});
+
 export const RULE_PROFILES = Object.freeze([
   MARKET_REGIME_RULE_PROFILE,
   MARKET_DIRECTION_RULE_PROFILE,
@@ -87,11 +111,12 @@ export const RULE_PROFILES = Object.freeze([
   US_ASSET_FLOW_RULE_PROFILE,
   GLOBAL_ROTATION_RULE_PROFILE,
   BUNDLE_RULE_PROFILE,
+  ANOMALY_RADAR_RULE_PROFILE,
 ]);
 
 export function assertExperimentalShadowProfile(ruleProfile) {
   if (ruleProfile?.status !== "EXPERIMENTAL" || ruleProfile?.lifecycle !== FeatureLifecycle.SHADOW) {
-    throw new Error("Package 002 rule profiles must remain EXPERIMENTAL and SHADOW.");
+    throw new Error("Analytical rule profiles must remain EXPERIMENTAL and SHADOW.");
   }
   return ruleProfile;
 }

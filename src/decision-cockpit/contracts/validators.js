@@ -1,4 +1,5 @@
 import {
+  AnomalyType,
   AssessmentHorizon,
   DirectionState,
   EvidenceType,
@@ -11,6 +12,7 @@ import {
   TrafficLight,
   enumValues,
 } from "../domain/constants.js";
+import { ANOMALY_TYPE_ORDER, discoveryCandidateId } from "./anomaly-discovery.js";
 
 const SOURCE_TYPES = ["official", "exchange", "regulator", "vendor", "aggregator", "derived"];
 const LATENCY_CLASSES = ["realtime", "delayed", "daily", "weekly", "monthly", "quarterly"];
@@ -160,7 +162,7 @@ function validateEngineMetaFields(value, issues) {
       issueIf(key.length === 0 || typeof version !== "string" || version.length === 0, issues, "inputSchemaVersions keys and values must be non-empty strings");
     });
   }
-  issueIf(value.deterministic !== true, issues, "deterministic must be true for Package 002 engine metadata");
+  issueIf(value.deterministic !== true, issues, "deterministic must be true for analytical engine metadata");
 }
 
 export function validateEngineMeta(value) {
@@ -320,9 +322,73 @@ function validateAlert(value, issues) {
   requireUtc(value, "createdAt", issues);
   requireEnum(value, "severity", ["info", "watch", "warning", "critical"], issues);
   issueIf(typeof value.marketWide !== "boolean", issues, "marketWide must be boolean");
-  requireArray(value, "rawEvidence", issues);
+  validateEvidenceArray(value, issues, "rawEvidence");
   requireEnum(value, "trafficLight", enumValues(TrafficLight), issues);
   try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+}
+
+function validateCanonicalStringArray(value, field, issues, { nonEmpty = false } = {}) {
+  requireArray(value, field, issues);
+  if (!Array.isArray(value[field])) return;
+  value[field].forEach((item, index) => issueIf(typeof item !== "string" || item.length === 0, issues, `${field}[${index}] must be a non-empty string`));
+  if (nonEmpty) issueIf(value[field].length === 0, issues, `${field} must be non-empty`);
+  if (value[field].every((item) => typeof item === "string")) {
+    const canonical = [...new Set(value[field])].sort((left, right) => left.localeCompare(right));
+    issueIf(JSON.stringify(value[field]) !== JSON.stringify(canonical), issues, `${field} must be unique and canonically ordered`);
+  }
+}
+
+function validateCanonicalEvidenceArray(value, field, issues, { nonEmpty = false } = {}) {
+  validateEvidenceArray(value, issues, field);
+  if (!Array.isArray(value[field])) return;
+  if (nonEmpty) issueIf(value[field].length === 0, issues, `${field} must be non-empty`);
+  const ids = value[field].map((item) => item?.evidenceId);
+  if (ids.every((item) => typeof item === "string")) {
+    const canonical = [...new Set(ids)].sort((left, right) => left.localeCompare(right));
+    issueIf(JSON.stringify(ids) !== JSON.stringify(canonical), issues, `${field} must be unique and ordered by evidenceId`);
+  }
+}
+
+function validateDiscoveryCandidate(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["candidateId", "symbol"].forEach((field) => requireString(value, field, issues));
+  requireUtc(value, "timestamp", issues);
+  requireArray(value, "anomalyTypes", issues);
+  if (Array.isArray(value.anomalyTypes)) {
+    issueIf(value.anomalyTypes.length === 0, issues, "anomalyTypes must be non-empty");
+    value.anomalyTypes.forEach((type, index) => issueIf(!enumValues(AnomalyType).includes(type), issues, `anomalyTypes[${index}] is invalid`));
+    const canonical = ANOMALY_TYPE_ORDER.filter((type) => value.anomalyTypes.includes(type));
+    issueIf(JSON.stringify(value.anomalyTypes) !== JSON.stringify(canonical), issues, "anomalyTypes must be unique and canonically ordered");
+  }
+  requireEnum(value, "severity", ["info", "watch", "warning", "critical"], issues);
+  try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+  validateCanonicalEvidenceArray(value, "supportingEvidence", issues, { nonEmpty: true });
+  validateCanonicalEvidenceArray(value, "opposingEvidence", issues);
+  validateCanonicalStringArray(value, "catalystEventIds", issues);
+  validateCanonicalStringArray(value, "sourceSnapshotIds", issues, { nonEmpty: true });
+  requireNullableString(value, "sectorId", issues);
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (isRecord(value.engineMeta)) {
+    issueIf(value.engineMeta.lifecycle !== FeatureLifecycle.SHADOW, issues, "Package 003 DiscoveryCandidate lifecycle must be SHADOW");
+    issueIf(value.engineMeta.evaluatedAt !== value.timestamp, issues, "timestamp must equal engineMeta.evaluatedAt");
+    if ([value.engineMeta.engineVersion, value.engineMeta.ruleProfileId, value.timestamp, value.symbol].every((item) => typeof item === "string" && item.length > 0)) {
+      const expectedId = discoveryCandidateId({
+        engineVersion: value.engineMeta.engineVersion,
+        ruleProfileId: value.engineMeta.ruleProfileId,
+        timestamp: value.timestamp,
+        symbol: value.symbol,
+      });
+      issueIf(value.candidateId !== expectedId, issues, "candidateId must match the approved deterministic identity tuple");
+    }
+  }
+  if (isRecord(value.freshness) && value.freshness.decisionGrade === false) {
+    issueIf(!Array.isArray(value.confidence?.degradedBy) || value.confidence.degradedBy.length === 0, issues, "non-decision-grade freshness must explicitly degrade confidence");
+  }
+  for (const forbidden of ["BUY", "SELL", "STRONG_BUY", "STRONG_SELL", "targetPrice", "positionSize", "orderType", "brokerAction"]) {
+    issueIf(Object.hasOwn(value, forbidden), issues, `forbidden trade field: ${forbidden}`);
+  }
 }
 
 function validateDecisionState(value, issues) {
@@ -503,6 +569,7 @@ const validators = {
   PremarketSnapshot: validatePremarketSnapshot,
   CatalystEvent: validateCatalystEvent,
   Alert: validateAlert,
+  DiscoveryCandidate: validateDiscoveryCandidate,
   DecisionState: validateDecisionState,
   TradeDecisionZone: validateTradeDecisionZone,
   PredictionRecord: validatePredictionRecord,

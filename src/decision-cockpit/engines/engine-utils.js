@@ -28,12 +28,14 @@ export function assertEvaluationTime(evaluatedAt, snapshots = []) {
   const evaluationMs = Date.parse(evaluatedAt);
   if (!Number.isFinite(evaluationMs)) throw new TypeError("evaluatedAt must be a UTC timestamp");
   for (const snapshot of snapshots.filter(Boolean)) {
+    const inputId = snapshot.snapshotId ?? snapshot.eventId ?? "unknown-input";
     if (Date.parse(snapshot.timestamp) > evaluationMs) {
-      throw new Error(`Future data is forbidden: ${snapshot.snapshotId}`);
+      throw new Error(`Future data is forbidden: ${inputId}`);
     }
     const sources = [...(snapshot.evidenceRefs ?? []).map((item) => item.sourceMeta), ...(snapshot.sourceMeta ? [snapshot.sourceMeta] : [])];
     for (const source of sources) {
       if (source.observedAt !== null && Date.parse(source.observedAt) > evaluationMs) throw new Error(`Future source observation is forbidden: ${source.sourceId}`);
+      if (source.receivedAt !== null && Date.parse(source.receivedAt) > evaluationMs) throw new Error(`Future source receipt is forbidden: ${source.sourceId}`);
       if (source.reportingPeriodEnd != null && Date.parse(source.reportingPeriodEnd) > evaluationMs) throw new Error(`Future reporting period is forbidden: ${source.sourceId}`);
     }
   }

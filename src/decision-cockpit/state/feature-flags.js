@@ -8,7 +8,7 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   globalCapitalRotation: FeatureLifecycle.SHADOW,
   usAssetFlowMonitor: FeatureLifecycle.SHADOW,
   premarketIntelligence: FeatureLifecycle.SHADOW,
-  anomalyRadar: FeatureLifecycle.OFF,
+  anomalyRadar: FeatureLifecycle.SHADOW,
   stockDecisionEngine: FeatureLifecycle.OFF,
   tradeDecisionZones: FeatureLifecycle.OFF,
   modelTestLab: FeatureLifecycle.SHADOW,
