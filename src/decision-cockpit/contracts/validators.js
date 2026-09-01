@@ -1,8 +1,12 @@
 import {
+  AssessmentHorizon,
   DirectionState,
   EvidenceType,
   FeatureLifecycle,
+  FlowMode,
+  FlowState,
   FreshnessStatus,
+  GlobalRotationState,
   SessionPhase,
   TrafficLight,
   enumValues,
@@ -56,6 +60,14 @@ function requireArray(value, field, issues) {
 
 function requireNullableNumber(value, field, issues) {
   issueIf(value[field] !== null && (typeof value[field] !== "number" || !Number.isFinite(value[field])), issues, `${field} must be a finite number or null`);
+}
+
+function requireNullableString(value, field, issues) {
+  issueIf(value[field] !== null && typeof value[field] !== "string", issues, `${field} must be a string or null`);
+}
+
+function requireBoundedScore(value, field, issues) {
+  issueIf(value[field] !== null && (typeof value[field] !== "number" || !Number.isFinite(value[field]) || value[field] < -1 || value[field] > 1), issues, `${field} must be between -1 and 1 or null`);
 }
 
 function validateMeasurement(value, field, issues, { nullable = false } = {}) {
@@ -128,6 +140,28 @@ export function validateFreshnessAssessment(value) {
     issueIf([FreshnessStatus.STALE, FreshnessStatus.UNAVAILABLE].includes(value.status) && value.decisionGrade, issues, "stale/unavailable data cannot be decision-grade");
   }
   if (issues.length) throw new ContractValidationError("FreshnessAssessment", issues);
+  return value;
+}
+
+function validateEngineMetaFields(value, issues) {
+  issueIf(!isRecord(value), issues, "must be an object");
+  if (!isRecord(value)) return;
+  ["engineId", "engineVersion", "ruleProfileId"].forEach((field) => requireString(value, field, issues));
+  requireEnum(value, "lifecycle", enumValues(FeatureLifecycle), issues);
+  requireUtc(value, "evaluatedAt", issues);
+  issueIf(!isRecord(value.inputSchemaVersions), issues, "inputSchemaVersions must be an object map");
+  if (isRecord(value.inputSchemaVersions)) {
+    Object.entries(value.inputSchemaVersions).forEach(([key, version]) => {
+      issueIf(key.length === 0 || typeof version !== "string" || version.length === 0, issues, "inputSchemaVersions keys and values must be non-empty strings");
+    });
+  }
+  issueIf(value.deterministic !== true, issues, "deterministic must be true for Package 002 engine metadata");
+}
+
+export function validateEngineMeta(value) {
+  const issues = [];
+  validateEngineMetaFields(value, issues);
+  if (issues.length) throw new ContractValidationError("EngineMeta", issues);
   return value;
 }
 
@@ -268,6 +302,9 @@ function validateDecisionState(value, issues) {
   validateEvidenceArray(value, issues, "supportingEvidence");
   validateEvidenceArray(value, issues, "opposingEvidence");
   try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  if (value.engineMeta !== undefined) {
+    try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  }
   if (value.state === "UNKNOWN") issueIf(value.trafficLight !== TrafficLight.GREY, issues, "UNKNOWN decision state must be GREY");
 }
 
@@ -306,7 +343,121 @@ function validatePredictionOutcome(value, issues) {
   issueIf(typeof value.pass !== "boolean", issues, "pass must be boolean");
 }
 
+function validateDirectionAssessment(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["assessmentId", "scopeId"].forEach((field) => requireString(value, field, issues));
+  requireUtc(value, "timestamp", issues);
+  requireEnum(value, "scope", ["MARKET", "SECTOR", "STOCK"], issues);
+  requireEnum(value, "horizon", enumValues(AssessmentHorizon), issues);
+  requireEnum(value, "direction", enumValues(DirectionState), issues);
+  requireBoundedScore(value, "score", issues);
+  requireEnum(value, "trafficLight", enumValues(TrafficLight), issues);
+  try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+  validateEvidenceArray(value, issues, "supportingEvidence");
+  validateEvidenceArray(value, issues, "opposingEvidence");
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (value.direction === DirectionState.UNKNOWN) {
+    issueIf(value.trafficLight !== TrafficLight.GREY, issues, "UNKNOWN direction requires GREY");
+    issueIf(value.score !== null, issues, "UNKNOWN direction requires score=null");
+  }
+}
+
+function validateTypedEvidenceArray(value, field, allowedTypes, issues) {
+  validateEvidenceArray(value, issues, field);
+  if (Array.isArray(value[field])) {
+    value[field].forEach((evidence, index) => issueIf(!allowedTypes.includes(evidence.evidenceType), issues, `${field}[${index}] has invalid evidenceType ${evidence.evidenceType}`));
+  }
+}
+
+function validateFlowAssessment(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["assessmentId", "scopeId"].forEach((field) => requireString(value, field, issues));
+  requireUtc(value, "timestamp", issues);
+  requireEnum(value, "scope", ["MARKET", "SECTOR", "ASSET_CLASS"], issues);
+  requireEnum(value, "flowMode", enumValues(FlowMode), issues);
+  requireEnum(value, "state", enumValues(FlowState), issues);
+  requireEnum(value, "trafficLight", enumValues(TrafficLight), issues);
+  requireBoundedScore(value, "score", issues);
+  requireNullableNumber(value, "directFlowValue", issues);
+  requireNullableString(value, "currency", issues);
+  requireNullableString(value, "reportingPeriod", issues);
+  try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+  validateTypedEvidenceArray(value, "directEvidence", [EvidenceType.DIRECT], issues);
+  validateTypedEvidenceArray(value, "proxyEvidence", [EvidenceType.PROXY, EvidenceType.DERIVED], issues);
+  validateEvidenceArray(value, issues, "opposingEvidence");
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (value.flowMode === FlowMode.PROXY) issueIf(value.directFlowValue !== null, issues, "PROXY mode requires directFlowValue=null");
+  if (value.directFlowValue !== null) {
+    issueIf(!Array.isArray(value.directEvidence) || value.directEvidence.length === 0, issues, "numeric directFlowValue requires DIRECT evidence");
+    issueIf(value.currency === null, issues, "numeric directFlowValue requires currency");
+    issueIf(value.reportingPeriod === null, issues, "numeric directFlowValue requires reportingPeriod");
+  }
+  if (value.state === FlowState.INSUFFICIENT) {
+    issueIf(value.trafficLight !== TrafficLight.GREY, issues, "INSUFFICIENT flow requires GREY");
+    issueIf(value.score !== null, issues, "INSUFFICIENT flow requires score=null");
+  }
+}
+
+function validateGlobalRotationAssessment(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["assessmentId", "countryOrRegion"].forEach((field) => requireString(value, field, issues));
+  requireUtc(value, "timestamp", issues);
+  requireEnum(value, "horizon", ["overnight", "1d", "5d", "1m", "structural"], issues);
+  requireEnum(value, "state", enumValues(GlobalRotationState), issues);
+  requireEnum(value, "trafficLight", enumValues(TrafficLight), issues);
+  requireBoundedScore(value, "score", issues);
+  ["equityState", "bondState", "fxState", "relativeStrengthState", "directFlowState"].forEach((field) => requireEnum(value, field, enumValues(TrafficLight), issues));
+  requireNullableNumber(value, "directFlowValue", issues);
+  requireNullableString(value, "directFlowCurrency", issues);
+  try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+  validateTypedEvidenceArray(value, "directEvidence", [EvidenceType.DIRECT], issues);
+  validateTypedEvidenceArray(value, "proxyEvidence", [EvidenceType.PROXY, EvidenceType.DERIVED], issues);
+  validateEvidenceArray(value, issues, "opposingEvidence");
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (value.directFlowValue !== null) {
+    issueIf(!Array.isArray(value.directEvidence) || value.directEvidence.length === 0, issues, "numeric directFlowValue requires DIRECT evidence");
+    issueIf(value.directFlowCurrency === null, issues, "numeric directFlowValue requires directFlowCurrency");
+  }
+  if (value.state === GlobalRotationState.INSUFFICIENT) {
+    issueIf(value.trafficLight !== TrafficLight.GREY, issues, "INSUFFICIENT rotation requires GREY");
+    issueIf(value.score !== null, issues, "INSUFFICIENT rotation requires score=null");
+  }
+}
+
+function captureNestedIssues(label, validator, item, issues) {
+  const nested = [];
+  validator(item, nested);
+  issues.push(...nested.map((entry) => `${label}.${entry}`));
+}
+
+function validateMarketContextBundle(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  requireString(value, "bundleId", issues);
+  requireUtc(value, "timestamp", issues);
+  ["directionAssessments", "sectorFlowAssessments", "assetFlowAssessments", "globalRotationAssessments", "conflicts", "warnings", "sourceSnapshotIds", "generatedBy"].forEach((field) => requireArray(value, field, issues));
+  for (const field of ["conflicts", "warnings", "sourceSnapshotIds"]) {
+    if (Array.isArray(value[field])) value[field].forEach((item, index) => issueIf(typeof item !== "string" || item.length === 0, issues, `${field}[${index}] must be a non-empty string`));
+  }
+  if (value.marketDecisionState !== null) captureNestedIssues("marketDecisionState", validateDecisionState, value.marketDecisionState, issues);
+  if (Array.isArray(value.directionAssessments)) value.directionAssessments.forEach((item, index) => captureNestedIssues(`directionAssessments[${index}]`, validateDirectionAssessment, item, issues));
+  for (const field of ["sectorFlowAssessments", "assetFlowAssessments"]) {
+    if (Array.isArray(value[field])) value[field].forEach((item, index) => captureNestedIssues(`${field}[${index}]`, validateFlowAssessment, item, issues));
+  }
+  if (Array.isArray(value.globalRotationAssessments)) value.globalRotationAssessments.forEach((item, index) => captureNestedIssues(`globalRotationAssessments[${index}]`, validateGlobalRotationAssessment, item, issues));
+  if (Array.isArray(value.generatedBy)) value.generatedBy.forEach((item, index) => {
+    try { validateEngineMeta(item); } catch (error) { issues.push(...error.issues.map((entry) => `generatedBy[${index}].${entry}`)); }
+  });
+}
+
 const validators = {
+  EngineMeta: (value, issues) => validateEngineMetaFields(value, issues),
   MarketSnapshot: validateMarketSnapshot,
   BreadthSnapshot: validateBreadthSnapshot,
   SectorSnapshot: validateSectorSnapshot,
@@ -320,6 +471,10 @@ const validators = {
   TradeDecisionZone: validateTradeDecisionZone,
   PredictionRecord: validatePredictionRecord,
   PredictionOutcome: validatePredictionOutcome,
+  DirectionAssessment: validateDirectionAssessment,
+  FlowAssessment: validateFlowAssessment,
+  GlobalRotationAssessment: validateGlobalRotationAssessment,
+  MarketContextBundle: validateMarketContextBundle,
 };
 
 export const supportedContractNames = Object.freeze(Object.keys(validators));
@@ -337,4 +492,3 @@ export function validateFeatureLifecycle(value) {
   if (!enumValues(FeatureLifecycle).includes(value)) throw new Error(`Invalid feature lifecycle: ${value}`);
   return value;
 }
-

@@ -20,6 +20,35 @@ export const DirectionState = Object.freeze({
   UNKNOWN: "UNKNOWN",
 });
 
+export const AssessmentHorizon = Object.freeze({
+  M30: "30m",
+  M60: "60m",
+  M120: "120m",
+  SESSION: "SESSION",
+});
+
+export const FlowMode = Object.freeze({
+  DIRECT: "DIRECT",
+  PROXY: "PROXY",
+  MIXED: "MIXED",
+});
+
+export const FlowState = Object.freeze({
+  DEMAND: "DEMAND",
+  SELLING_PRESSURE: "SELLING_PRESSURE",
+  MIXED: "MIXED",
+  NEUTRAL: "NEUTRAL",
+  INSUFFICIENT: "INSUFFICIENT",
+});
+
+export const GlobalRotationState = Object.freeze({
+  POSITIVE_ROTATION: "POSITIVE_ROTATION",
+  NEGATIVE_ROTATION: "NEGATIVE_ROTATION",
+  MIXED: "MIXED",
+  NEUTRAL: "NEUTRAL",
+  INSUFFICIENT: "INSUFFICIENT",
+});
+
 export const FreshnessStatus = Object.freeze({
   LIVE: "LIVE",
   DELAYED: "DELAYED",
@@ -43,4 +72,3 @@ export const SessionPhase = Object.freeze({
 });
 
 export const enumValues = (enumeration) => Object.values(enumeration);
-

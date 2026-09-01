@@ -53,7 +53,13 @@
  * BreadthSnapshot, SectorSnapshot, StockSnapshot, AssetFlowSnapshot,
  * CountryFlowSnapshot, PremarketSnapshot, CatalystEvent, Alert,
  * DecisionState, TradeDecisionZone and PredictionOutcome.
+ *
+ * Package 002 additive engine-output contracts:
+ * @typedef {{engineId:string, engineVersion:string, lifecycle:"OFF"|"SHADOW"|"BETA"|"ACTIVE", evaluatedAt:string, inputSchemaVersions:Record<string,string>, ruleProfileId:string, deterministic:boolean}} EngineMeta
+ * @typedef {{schemaVersion:string, assessmentId:string, timestamp:string, scope:"MARKET"|"SECTOR"|"STOCK", scopeId:string, horizon:"30m"|"60m"|"120m"|"SESSION", direction:"IMPROVING"|"STABLE"|"DETERIORATING"|"UNKNOWN", score:number|null, trafficLight:"GREEN"|"ORANGE"|"RED"|"GREY", confidence:Confidence, supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], freshness:FreshnessAssessment, engineMeta:EngineMeta}} DirectionAssessment
+ * @typedef {{schemaVersion:string, assessmentId:string, timestamp:string, scope:"MARKET"|"SECTOR"|"ASSET_CLASS", scopeId:string, flowMode:"DIRECT"|"PROXY"|"MIXED", state:"DEMAND"|"SELLING_PRESSURE"|"MIXED"|"NEUTRAL"|"INSUFFICIENT", trafficLight:"GREEN"|"ORANGE"|"RED"|"GREY", score:number|null, directFlowValue:number|null, currency:string|null, reportingPeriod:string|null, confidence:Confidence, directEvidence:EvidenceRef[], proxyEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], freshness:FreshnessAssessment, engineMeta:EngineMeta}} FlowAssessment
+ * @typedef {{schemaVersion:string, assessmentId:string, timestamp:string, countryOrRegion:string, horizon:"overnight"|"1d"|"5d"|"1m"|"structural", state:"POSITIVE_ROTATION"|"NEGATIVE_ROTATION"|"MIXED"|"NEUTRAL"|"INSUFFICIENT", trafficLight:"GREEN"|"ORANGE"|"RED"|"GREY", score:number|null, equityState:string, bondState:string, fxState:string, relativeStrengthState:string, directFlowState:string, directFlowValue:number|null, directFlowCurrency:string|null, confidence:Confidence, directEvidence:EvidenceRef[], proxyEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], freshness:FreshnessAssessment, engineMeta:EngineMeta}} GlobalRotationAssessment
+ * @typedef {{schemaVersion:string, bundleId:string, timestamp:string, marketDecisionState:Object|null, directionAssessments:DirectionAssessment[], sectorFlowAssessments:FlowAssessment[], assetFlowAssessments:FlowAssessment[], globalRotationAssessments:GlobalRotationAssessment[], conflicts:string[], warnings:string[], sourceSnapshotIds:string[], generatedBy:EngineMeta[]}} MarketContextBundle
  */
 
 export {};
-

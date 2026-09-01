@@ -2,6 +2,9 @@ import { FeatureLifecycle } from "../domain/constants.js";
 import { validateFeatureLifecycle } from "../contracts/validators.js";
 
 export const DEFAULT_FEATURE_FLAGS = Object.freeze({
+  marketRegimeEngine: FeatureLifecycle.SHADOW,
+  marketDirectionEngine: FeatureLifecycle.SHADOW,
+  moneyFlowEngine: FeatureLifecycle.SHADOW,
   globalCapitalRotation: FeatureLifecycle.SHADOW,
   usAssetFlowMonitor: FeatureLifecycle.SHADOW,
   premarketIntelligence: FeatureLifecycle.SHADOW,
@@ -47,4 +50,3 @@ export class FeatureFlagRegistry {
     return Object.freeze(Object.fromEntries([...this.#flags.entries()].sort(([left], [right]) => left.localeCompare(right))));
   }
 }
-
