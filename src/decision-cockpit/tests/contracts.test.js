@@ -21,12 +21,14 @@ import { ContractValidationError, supportedContractNames, validateContract } fro
 import { EvidenceType, SCHEMA_VERSION, TrafficLight } from "../domain/constants.js";
 
 const timestamp = "2026-01-15T15:00:00.000Z";
+const sessionIdentity = { sessionDate: "2026-01-15", sessionPhase: "regular", sessionCalendarId: "mock.us-equities.v1" };
 const evidence = mockEvidence({ id: "test.evidence", field: "test", value: 1, unit: "ratio" });
 
 const breadth = {
   schemaVersion: SCHEMA_VERSION,
   snapshotId: "test.breadth",
   timestamp,
+  sessionIdentity,
   venue: "NASDAQ",
   advancers: measurement(1800, "count"), decliners: measurement(1200, "count"), unchanged: measurement(100, "count"),
   advancingVolume: measurement(2.1, "billion_shares"), decliningVolume: measurement(1.4, "billion_shares"),
@@ -39,6 +41,7 @@ const sector = {
   schemaVersion: SCHEMA_VERSION,
   snapshotId: "test.sector",
   timestamp,
+  sessionIdentity,
   sectorId: "TECHNOLOGY",
   benchmarkSymbol: "XLK",
   priceChangePct: measurement(1.2, "percent"),

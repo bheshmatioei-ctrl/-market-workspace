@@ -4,6 +4,7 @@ import { deepFreeze } from "../engines/engine-utils.js";
 export const MOCK_DATA_NOTICE = "MOCK / TEST DATA ONLY — NOT LIVE MARKET DATA";
 const CURRENT = "2026-02-03T20:00:00.000Z";
 const SESSION_START = "2026-02-03T14:30:00.000Z";
+const SESSION_IDENTITY = Object.freeze({ sessionDate: "2026-02-03", sessionPhase: SessionPhase.REGULAR, sessionCalendarId: "mock.us-equities.v1" });
 const TIMES = Object.freeze([SESSION_START, "2026-02-03T18:00:00.000Z", "2026-02-03T19:00:00.000Z", "2026-02-03T19:30:00.000Z", CURRENT]);
 
 const measurement = (value, unit, missingReason = null) => Object.freeze({ value, unit, missingReason });
@@ -49,6 +50,7 @@ function market(name, timestamp, price, change, { vix = 16, stale = false, small
     timestamp,
     sessionDate: "2026-02-03",
     sessionPhase: SessionPhase.REGULAR,
+    sessionIdentity: SESSION_IDENTITY,
     spy: measurement(spy, "USD"), qqq: measurement(spy * 0.86 * (1 + change / 600), "USD"),
     iwm: measurement(spy * 0.37 * smallCapFactor, "USD"), dia: measurement(spy * 0.74, "USD"),
     vix: measurement(vix, "index_points"), ust2y: measurement(4.05, "percent_yield"), ust10y: measurement(4.2, "percent_yield"),
@@ -71,6 +73,7 @@ function breadth(name, timestamp, strength, stale = false) {
     schemaVersion: SCHEMA_VERSION,
     snapshotId: `mock.pkg002.${name}.breadth.${timestamp}`,
     timestamp,
+    sessionIdentity: SESSION_IDENTITY,
     venue: "US_COMPOSITE",
     advancers: measurement(advancers, "count"), decliners: measurement(decliners, "count"), unchanged: measurement(100, "count"),
     advancingVolume: measurement(1.5 + 0.8 * strength, "billion_shares"), decliningVolume: measurement(1.5 - 0.8 * strength, "billion_shares"),
@@ -90,6 +93,7 @@ function sector(name, timestamp, sectorId, strength, { priceOverride = null } = 
     schemaVersion: SCHEMA_VERSION,
     snapshotId: `mock.pkg002.${name}.sector.${sectorId}.${timestamp}`,
     timestamp,
+    sessionIdentity: SESSION_IDENTITY,
     sectorId,
     benchmarkSymbol: sectorId === "TECHNOLOGY" ? "XLK" : sectorId === "FINANCIALS" ? "XLF" : "XLI",
     priceChangePct: measurement(price, "percent"),

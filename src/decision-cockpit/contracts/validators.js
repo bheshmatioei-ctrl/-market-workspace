@@ -30,6 +30,11 @@ const isUtcTimestamp = (value) => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return false;
   return !Number.isNaN(Date.parse(value));
 };
+const isSessionDate = (value) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+};
 
 function issueIf(condition, issues, message) {
   if (condition) issues.push(message);
@@ -182,11 +187,40 @@ function validateSnapshotBase(value, issues) {
   validateEvidenceArray(value, issues);
 }
 
+function validateSessionIdentityFields(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("sessionIdentity must be an object");
+    return;
+  }
+  issueIf(!isSessionDate(value.sessionDate), issues, "sessionIdentity.sessionDate must use YYYY-MM-DD");
+  requireEnum(value, "sessionPhase", enumValues(SessionPhase), issues);
+  requireString(value, "sessionCalendarId", issues);
+}
+
+export function validateSessionIdentity(value) {
+  const issues = [];
+  validateSessionIdentityFields(value, issues);
+  if (issues.length) throw new ContractValidationError("SessionIdentity", issues);
+  return value;
+}
+
+function validateOptionalSessionIdentity(value, issues) {
+  if (value.sessionIdentity === undefined) return;
+  const nested = [];
+  validateSessionIdentityFields(value.sessionIdentity, nested);
+  issues.push(...nested);
+}
+
 function validateMarketSnapshot(value, issues) {
   validateSnapshotBase(value, issues);
   if (!isRecord(value)) return;
   requireString(value, "sessionDate", issues);
   requireEnum(value, "sessionPhase", enumValues(SessionPhase), issues);
+  validateOptionalSessionIdentity(value, issues);
+  if (isRecord(value.sessionIdentity)) {
+    issueIf(value.sessionDate !== value.sessionIdentity.sessionDate, issues, "sessionDate must match sessionIdentity.sessionDate");
+    issueIf(value.sessionPhase !== value.sessionIdentity.sessionPhase, issues, "sessionPhase must match sessionIdentity.sessionPhase");
+  }
   ["spy", "qqq", "iwm", "dia", "vix", "ust2y", "ust10y", "dxy", "gold", "oil"].forEach((field) => validateMeasurement(value, field, issues));
   validateMeasurement(value, "bitcoinOptional", issues, { nullable: true });
   try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
@@ -196,6 +230,7 @@ function validateBreadthSnapshot(value, issues) {
   validateSnapshotBase(value, issues);
   if (!isRecord(value)) return;
   requireEnum(value, "venue", ["NYSE", "NASDAQ", "US_COMPOSITE"], issues);
+  validateOptionalSessionIdentity(value, issues);
   ["advancers", "decliners", "unchanged", "advancingVolume", "decliningVolume", "newHighs", "newLows"].forEach((field) => validateMeasurement(value, field, issues));
   if (value.pctAbove50DMA != null) validateMeasurement(value, "pctAbove50DMA", issues);
   if (value.pctAbove200DMA != null) validateMeasurement(value, "pctAbove200DMA", issues);
@@ -205,6 +240,7 @@ function validateSectorSnapshot(value, issues) {
   validateSnapshotBase(value, issues);
   if (!isRecord(value)) return;
   ["sectorId", "benchmarkSymbol"].forEach((field) => requireString(value, field, issues));
+  validateOptionalSessionIdentity(value, issues);
   ["priceChangePct", "relativeStrengthVsSPY", "relativeVolume"].forEach((field) => validateMeasurement(value, field, issues));
   if (value.breadthPctPositive != null) validateMeasurement(value, "breadthPctPositive", issues);
   if (value.upDownVolumeRatio != null) validateMeasurement(value, "upDownVolumeRatio", issues);

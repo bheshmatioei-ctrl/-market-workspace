@@ -9,6 +9,7 @@ import {
 
 const MOCK_TIME = "2026-01-15T15:00:00.000Z";
 const MOCK_SESSION = "2026-01-15";
+const MOCK_SESSION_IDENTITY = Object.freeze({ sessionDate: MOCK_SESSION, sessionPhase: SessionPhase.REGULAR, sessionCalendarId: "mock.us-equities.v1" });
 
 export const measurement = (value, unit, missingReason = null) => Object.freeze({ value, unit, missingReason });
 
@@ -65,6 +66,7 @@ function marketSnapshot(snapshotId, values, freshness = mockFreshness()) {
     timestamp: MOCK_TIME,
     sessionDate: MOCK_SESSION,
     sessionPhase: SessionPhase.REGULAR,
+    sessionIdentity: MOCK_SESSION_IDENTITY,
     spy: measurement(values.spy, "USD"),
     qqq: measurement(values.qqq, "USD"),
     iwm: measurement(values.iwm, "USD"),
@@ -295,4 +297,3 @@ export const mockCockpitState = Object.freeze({
   discoveredStocks,
   placeholders: Object.freeze(["Money Flow", "Live Alerts", "Market Internals", "Macro / Risk", "Decision Timeline"]),
 });
-

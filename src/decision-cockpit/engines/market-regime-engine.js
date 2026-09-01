@@ -26,6 +26,31 @@ function flowSignal(assessment) {
   return assessment.score;
 }
 
+const average = (values) => values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : null;
+const uniqueEvidence = (items) => [...new Map(items.map((item) => [item.evidenceId, item])).values()]
+  .sort((left, right) => left.evidenceId.localeCompare(right.evidenceId));
+
+function directAssessmentSignal(assessment) {
+  if (assessment.state === "INSUFFICIENT" || !assessment.freshness.decisionGrade || assessment.directEvidence.length === 0) return null;
+  if (assessment.flowMode === "DIRECT") return flowSignal(assessment);
+  const values = assessment.directEvidence.map((item) => typeof item.value === "number" ? clamp(item.value) : null).filter(Number.isFinite);
+  return average(values);
+}
+
+function proxyEvidenceSignal(evidence) {
+  if (evidence.value === TrafficLight.GREEN) return 0.6;
+  if (evidence.value === TrafficLight.RED) return -0.6;
+  if (evidence.value === TrafficLight.ORANGE) return 0;
+  if (typeof evidence.value === "number" && ["normalized", "score"].includes(evidence.unit)) return clamp(evidence.value);
+  return null;
+}
+
+function proxyAssessmentSignal(assessment) {
+  if (assessment.state === "INSUFFICIENT" || !assessment.freshness.decisionGrade || assessment.proxyEvidence.length === 0) return null;
+  if (assessment.flowMode === "PROXY") return flowSignal(assessment);
+  return average(assessment.proxyEvidence.map(proxyEvidenceSignal).filter(Number.isFinite));
+}
+
 export function evaluateMarketRegime({
   marketSnapshot,
   breadthSnapshot,
@@ -68,10 +93,20 @@ export function evaluateMarketRegime({
   signals.push({ family: "sector_participation", value: sectorSnapshots.length ? (green - red) / sectorSnapshots.length : null, evidence: sectorSnapshots.flatMap((item) => item.evidenceRefs) });
   const vix = measurementValue(marketSnapshot?.vix);
   signals.push({ family: "volatility", value: vix === null ? null : vix <= ruleProfile.lowVix ? 0.7 : vix >= ruleProfile.highVix ? -0.8 : 0, evidence: marketSnapshot?.evidenceRefs?.filter((item) => item.field.includes("vix")) ?? [] });
-  const usableFlows = assetFlowAssessments.map(flowSignal).filter(Number.isFinite);
-  const rawDirectFlows = assetFlowSnapshots.filter((item) => item.flowType === "DIRECT").map((item) => measurementValue(item.flowValue)).filter(Number.isFinite).map((item) => clamp(item));
-  usableFlows.push(...rawDirectFlows);
-  signals.push({ family: "capital_flow", value: usableFlows.length ? usableFlows.reduce((sum, item) => sum + item, 0) / usableFlows.length : null, evidence: [...assetFlowSnapshots.flatMap((item) => item.evidenceRefs), ...assetFlowAssessments.flatMap((item) => [...item.directEvidence, ...item.proxyEvidence])] });
+  const assessmentDirectEvidence = uniqueEvidence(assetFlowAssessments.flatMap((item) => item.directEvidence));
+  const assessmentProxyEvidence = uniqueEvidence(assetFlowAssessments.flatMap((item) => item.proxyEvidence));
+  const representedDirectEvidenceIds = new Set(assessmentDirectEvidence.map((item) => item.evidenceId));
+  const unrepresentedRawDirect = assetFlowSnapshots.filter((item) => item.flowType === "DIRECT" &&
+    !item.sourceMeta.isStale &&
+    !item.evidenceRefs.some((evidence) => representedDirectEvidenceIds.has(evidence.evidenceId)));
+  const directSignals = [
+    ...assetFlowAssessments.map(directAssessmentSignal).filter(Number.isFinite),
+    ...unrepresentedRawDirect.map((item) => measurementValue(item.flowValue)).filter(Number.isFinite).map((item) => clamp(item)),
+  ];
+  const proxySignals = assetFlowAssessments.map(proxyAssessmentSignal).filter(Number.isFinite);
+  const rawDirectEvidence = uniqueEvidence(unrepresentedRawDirect.flatMap((item) => item.evidenceRefs.filter((evidence) => evidence.evidenceType === "DIRECT")));
+  signals.push({ family: "capital_flow_direct", value: average(directSignals), evidence: uniqueEvidence([...assessmentDirectEvidence, ...rawDirectEvidence]) });
+  signals.push({ family: "capital_flow_proxy", value: average(proxySignals), evidence: assessmentProxyEvidence });
   const rotationScores = globalRotationAssessments.filter((item) => item.state !== "INSUFFICIENT").map((item) => item.score).filter(Number.isFinite);
   signals.push({ family: "global_rotation", value: rotationScores.length ? rotationScores.reduce((sum, item) => sum + item, 0) / rotationScores.length : null, evidence: globalRotationAssessments.flatMap((item) => [...item.directEvidence, ...item.proxyEvidence]) });
 

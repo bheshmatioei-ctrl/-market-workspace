@@ -74,6 +74,7 @@ test("session boundaries are preserved and no interpolation occurs", () => {
   const prior = structuredClone(source[3]);
   prior.snapshotId = "mock.pkg002.other-session";
   prior.sessionDate = "2026-02-02";
+  prior.sessionIdentity.sessionDate = "2026-02-02";
   const window = new HistoricalSnapshotWindow({ outOfOrderPolicy: "SORT" });
   window.append("MarketSnapshot", "US_MARKET", prior).append("MarketSnapshot", "US_MARKET", source.at(-1));
   const result = window.comparisonFor("MarketSnapshot", "US_MARKET", source.at(-1), { minutes: 30, toleranceSeconds: 600 });

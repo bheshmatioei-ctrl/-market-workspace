@@ -11,6 +11,7 @@
  * @typedef {{schemaVersion:string, evidenceId:string, sourceMeta:SourceMeta, field:string, value:number|string|boolean|null, unit:string|null, evidenceType:"DIRECT"|"PROXY"|"DERIVED"}} EvidenceRef
  * @typedef {{schemaVersion:string, score:number, reasons:string[], degradedBy:string[]}} Confidence
  * @typedef {{schemaVersion:string, status:"LIVE"|"DELAYED"|"DEGRADED"|"STALE"|"UNAVAILABLE", assessedAt:string, ageSeconds:number|null, reason:string, decisionGrade:boolean}} FreshnessAssessment
+ * @typedef {{sessionDate:string, sessionPhase:"premarket"|"regular"|"afterhours"|"overnight", sessionCalendarId:string}} SessionIdentity
  *
  * @typedef {Object} MarketSnapshot
  * @property {string} schemaVersion
@@ -18,6 +19,7 @@
  * @property {string} timestamp
  * @property {string} sessionDate
  * @property {"premarket"|"regular"|"afterhours"|"overnight"} sessionPhase
+ * @property {SessionIdentity=} sessionIdentity Required when admitted to same-session historical comparison.
  * @property {Measurement} spy
  * @property {Measurement} qqq
  * @property {Measurement} iwm
