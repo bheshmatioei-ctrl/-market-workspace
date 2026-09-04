@@ -2,6 +2,7 @@ import {
   AnomalyType,
   AssessmentHorizon,
   CatalystImpactTier,
+  CockpitDisplayMode,
   DirectionState,
   EvidenceType,
   FeatureLifecycle,
@@ -11,6 +12,7 @@ import {
   FuturesInstrument,
   GlobalRotationState,
   LiquidityQuality,
+  MyFocusStatus,
   PremarketFreezeStatus,
   PremarketWindow,
   SessionPhase,
@@ -18,6 +20,20 @@ import {
   enumValues,
 } from "../domain/constants.js";
 import { ANOMALY_TYPE_ORDER, discoveryCandidateId } from "./anomaly-discovery.js";
+import {
+  ALERT_SEVERITY_ORDER,
+  canonicalPresentationValue,
+  cockpitProjectionId,
+  COCKPIT_PREMARKET_WINDOW_ORDER,
+  COCKPIT_PROJECTION_VERSION,
+  conflictDisplayRecordId,
+  DIRECTION_ORDER,
+  freshnessDisplayRecordId,
+  GLOBAL_HORIZON_ORDER,
+  lexicalCompare as presentationLexicalCompare,
+  orderedCompare,
+  warningDisplayRecordId,
+} from "./cockpit-presentation.js";
 import {
   PREMARKET_WINDOW_ORDER,
   parsePremarketAssessmentId,
@@ -489,6 +505,250 @@ function validatePremarketSnapshotExtension(value, issues) {
   }
 }
 
+function objectIdentity(value) {
+  return value?.bundleId ?? value?.decisionId ?? value?.assessmentId ?? value?.alertId ??
+    value?.candidateId ?? value?.snapshotId ?? value?.eventId ?? null;
+}
+
+function validatePresentationEvidenceOrdering(value, issues, label) {
+  for (const field of ["supportingEvidence", "opposingEvidence", "directEvidence", "proxyEvidence", "rawEvidence", "evidenceRefs"]) {
+    if (!Array.isArray(value?.[field])) continue;
+    const ids = value[field].map((item) => item?.evidenceId);
+    const canonical = [...new Set(ids)].sort(presentationLexicalCompare);
+    issueIf(JSON.stringify(ids) !== JSON.stringify(canonical), issues, `${label}.${field} must be unique and ordered by evidenceId`);
+  }
+}
+
+function validateFreshnessDisplayRecord(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  ["recordId", "sourceObjectId", "reason"].forEach((field) => requireString(value, field, issues));
+  requireEnum(value, "status", enumValues(FreshnessStatus), issues);
+  requireUtc(value, "assessedAt", issues);
+  requireNullableNumber(value, "ageSeconds", issues);
+  issueIf(typeof value.decisionGrade !== "boolean", issues, "decisionGrade must be boolean");
+  if ([FreshnessStatus.STALE, FreshnessStatus.UNAVAILABLE].includes(value.status)) {
+    issueIf(value.decisionGrade, issues, "STALE/UNAVAILABLE cannot be decision-grade");
+  }
+  if ([value.sourceObjectId, value.status, value.assessedAt].every((item) => typeof item === "string" && item.length > 0)) {
+    issueIf(value.recordId !== freshnessDisplayRecordId(value), issues, "recordId must match the approved deterministic identity");
+  }
+}
+
+function validateConflictDisplayRecord(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  ["conflictId", "description"].forEach((field) => requireString(value, field, issues));
+  issueIf(value.label !== "CONFLICT", issues, "label must be CONFLICT");
+  validateCanonicalStringArray(value, "sourceObjectIds", issues, { nonEmpty: true });
+  validateCanonicalEvidenceArray(value, "supportingEvidence", issues);
+  validateCanonicalEvidenceArray(value, "opposingEvidence", issues);
+  if (Array.isArray(value.sourceObjectIds) && typeof value.description === "string") {
+    issueIf(value.conflictId !== conflictDisplayRecordId(value), issues, "conflictId must match the approved deterministic identity");
+  }
+}
+
+function validateWarningDisplayRecord(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  ["warningId", "sourceObjectId", "message", "sourceField"].forEach((field) => requireString(value, field, issues));
+  if ([value.sourceObjectId, value.sourceField, value.message].every((item) => typeof item === "string" && item.length > 0)) {
+    issueIf(value.warningId !== warningDisplayRecordId(value), issues, "warningId must match the approved deterministic identity");
+  }
+}
+
+function validateProjectionMeta(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  issueIf(value.projectionVersion !== COCKPIT_PROJECTION_VERSION, issues, `projectionVersion must be ${COCKPIT_PROJECTION_VERSION}`);
+  issueIf(value.deterministic !== true, issues, "deterministic must be true");
+  requireUtc(value, "generatedAt", issues);
+  validateCanonicalStringArray(value, "sourceEngineVersions", issues);
+  validateCanonicalStringArray(value, "sourceRuleProfiles", issues);
+  requireEnum(value, "lifecycleDisplayMode", enumValues(CockpitDisplayMode), issues);
+}
+
+function validateCockpitMarketView(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  if (value.regime !== null) captureNestedIssues("regime", validateDecisionState, value.regime, issues);
+  for (const field of ["directions", "flow", "assetFlow", "alerts"]) requireArray(value, field, issues);
+  if (Array.isArray(value.directions)) {
+    value.directions.forEach((item, index) => captureNestedIssues(`directions[${index}]`, validateDirectionAssessment, item, issues));
+    const canonical = [...value.directions].sort((left, right) => orderedCompare(DIRECTION_ORDER, left.horizon, right.horizon) || presentationLexicalCompare(left.assessmentId, right.assessmentId));
+    issueIf(canonicalPresentationValue(value.directions) !== canonicalPresentationValue(canonical), issues, "directions must use canonical horizon/assessment ordering");
+  }
+  for (const field of ["flow", "assetFlow"]) {
+    if (!Array.isArray(value[field])) continue;
+    value[field].forEach((item, index) => captureNestedIssues(`${field}[${index}]`, validateFlowAssessment, item, issues));
+    const canonical = [...value[field]].sort((left, right) => presentationLexicalCompare(left.scope, right.scope) || presentationLexicalCompare(left.scopeId, right.scopeId) || presentationLexicalCompare(left.assessmentId, right.assessmentId));
+    issueIf(canonicalPresentationValue(value[field]) !== canonicalPresentationValue(canonical), issues, `${field} must use canonical scope/identity ordering`);
+  }
+  if (Array.isArray(value.flow)) value.flow.forEach((item) => issueIf(item.scope === "ASSET_CLASS", issues, "market.flow cannot contain ASSET_CLASS assessments"));
+  if (Array.isArray(value.assetFlow)) value.assetFlow.forEach((item) => issueIf(item.scope !== "ASSET_CLASS", issues, "market.assetFlow requires ASSET_CLASS assessments"));
+  if (Array.isArray(value.alerts)) {
+    value.alerts.forEach((item, index) => captureNestedIssues(`alerts[${index}]`, validateAlert, item, issues));
+    const canonical = [...value.alerts].sort((left, right) => presentationLexicalCompare(left.createdAt, right.createdAt) ||
+      orderedCompare(ALERT_SEVERITY_ORDER, left.severity, right.severity) || presentationLexicalCompare(left.alertId, right.alertId));
+    issueIf(canonicalPresentationValue(value.alerts) !== canonicalPresentationValue(canonical), issues, "alerts must use canonical timestamp/severity/identity ordering");
+  }
+  [value.regime, ...(value.directions ?? []), ...(value.flow ?? []), ...(value.assetFlow ?? []), ...(value.alerts ?? [])]
+    .filter(Boolean).forEach((item) => validatePresentationEvidenceOrdering(item, issues, objectIdentity(item) ?? "market-object"));
+}
+
+function validateCockpitPremarketView(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  if (value.snapshot !== null) captureNestedIssues("snapshot", validatePremarketSnapshot, value.snapshot, issues);
+  requireArray(value, "windows", issues);
+  if (Array.isArray(value.windows)) {
+    value.windows.forEach((item, index) => captureNestedIssues(`windows[${index}]`, validatePremarketWindowAssessment, item, issues));
+    const canonical = [...value.windows].sort((left, right) => orderedCompare(COCKPIT_PREMARKET_WINDOW_ORDER, left.window, right.window) || presentationLexicalCompare(left.assessmentId, right.assessmentId));
+    issueIf(canonicalPresentationValue(value.windows) !== canonicalPresentationValue(canonical), issues, "windows must use canonical window/assessment ordering");
+  }
+  if (Array.isArray(value.snapshot?.windowAssessments) && Array.isArray(value.windows)) {
+    const byId = new Map(value.snapshot.windowAssessments.map((item) => [item.assessmentId, canonicalPresentationValue(item)]));
+    for (const window of value.windows) {
+      if (byId.has(window.assessmentId)) issueIf(byId.get(window.assessmentId) !== canonicalPresentationValue(window), issues, `window identity ${window.assessmentId} has mismatched canonical bytes`);
+    }
+  }
+  [value.snapshot, ...(value.windows ?? [])].filter(Boolean)
+    .forEach((item) => validatePresentationEvidenceOrdering(item, issues, objectIdentity(item) ?? "premarket-object"));
+}
+
+function validateCockpitGlobalCapitalView(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  requireArray(value, "assessments", issues);
+  if (Array.isArray(value.assessments)) {
+    value.assessments.forEach((item, index) => captureNestedIssues(`assessments[${index}]`, validateGlobalRotationAssessment, item, issues));
+    const canonical = [...value.assessments].sort((left, right) => presentationLexicalCompare(left.countryOrRegion, right.countryOrRegion) ||
+      orderedCompare(GLOBAL_HORIZON_ORDER, left.horizon, right.horizon) || presentationLexicalCompare(left.assessmentId, right.assessmentId));
+    issueIf(canonicalPresentationValue(value.assessments) !== canonicalPresentationValue(canonical), issues, "assessments must use canonical country/horizon/identity ordering");
+    value.assessments.forEach((item) => validatePresentationEvidenceOrdering(item, issues, item.assessmentId));
+  }
+}
+
+function validateCockpitDiscoveryView(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  requireArray(value, "candidates", issues);
+  requireEnum(value, "myFocusStatus", enumValues(MyFocusStatus), issues);
+  if (Array.isArray(value.candidates)) {
+    value.candidates.forEach((item, index) => captureNestedIssues(`candidates[${index}]`, validateDiscoveryCandidate, item, issues));
+    const canonical = [...value.candidates].sort((left, right) => presentationLexicalCompare(left.symbol, right.symbol) || presentationLexicalCompare(left.candidateId, right.candidateId));
+    issueIf(canonicalPresentationValue(value.candidates) !== canonicalPresentationValue(canonical), issues, "candidates must use canonical symbol/identity ordering");
+    value.candidates.forEach((item) => validatePresentationEvidenceOrdering(item, issues, item.candidateId));
+  }
+}
+
+const DISPLAY_EVIDENCE_CONTRACTS = Object.freeze({
+  marketSnapshots: validateMarketSnapshot,
+  breadthSnapshots: validateBreadthSnapshot,
+  sectorSnapshots: validateSectorSnapshot,
+  stockSnapshots: validateStockSnapshot,
+  assetFlowSnapshots: validateAssetFlowSnapshot,
+  futuresSnapshots: validateFuturesSnapshot,
+  premarketStockSnapshots: validatePremarketStockSnapshot,
+  catalystEvents: validateCatalystEvent,
+});
+
+function validateCockpitDisplayEvidence(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  for (const [field, validator] of Object.entries(DISPLAY_EVIDENCE_CONTRACTS)) {
+    requireArray(value, field, issues);
+    if (!Array.isArray(value[field])) continue;
+    value[field].forEach((item, index) => captureNestedIssues(`${field}[${index}]`, validator, item, issues));
+    const canonical = [...value[field]].sort((left, right) => presentationLexicalCompare(objectIdentity(left) ?? "", objectIdentity(right) ?? ""));
+    issueIf(canonicalPresentationValue(value[field]) !== canonicalPresentationValue(canonical), issues, `${field} must be ordered by approved object identity`);
+    value[field].forEach((item) => validatePresentationEvidenceOrdering(item, issues, objectIdentity(item) ?? field));
+  }
+}
+
+function projectionNestedObjects(value) {
+  return [
+    value.market?.regime,
+    ...(value.market?.directions ?? []),
+    ...(value.market?.flow ?? []),
+    ...(value.market?.assetFlow ?? []),
+    ...(value.market?.alerts ?? []),
+    value.premarket?.snapshot,
+    ...(value.premarket?.windows ?? []),
+    ...(value.globalCapital?.assessments ?? []),
+    ...(value.discovery?.candidates ?? []),
+    ...Object.values(value.displayEvidence ?? {}).flatMap((items) => Array.isArray(items) ? items : []),
+  ].filter(Boolean);
+}
+
+function validateCockpitProjection(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  requireString(value, "projectionId", issues);
+  requireUtc(value, "generatedAt", issues);
+  requireEnum(value, "displayMode", enumValues(CockpitDisplayMode), issues);
+  captureNestedIssues("market", validateCockpitMarketView, value.market, issues);
+  captureNestedIssues("premarket", validateCockpitPremarketView, value.premarket, issues);
+  captureNestedIssues("globalCapital", validateCockpitGlobalCapitalView, value.globalCapital, issues);
+  captureNestedIssues("discovery", validateCockpitDiscoveryView, value.discovery, issues);
+  if (value.displayEvidence !== undefined) captureNestedIssues("displayEvidence", validateCockpitDisplayEvidence, value.displayEvidence, issues);
+  requireArray(value, "freshnessSummary", issues);
+  if (Array.isArray(value.freshnessSummary)) {
+    value.freshnessSummary.forEach((item, index) => captureNestedIssues(`freshnessSummary[${index}]`, validateFreshnessDisplayRecord, item, issues));
+    const canonical = [...value.freshnessSummary].sort((left, right) => presentationLexicalCompare(left.sourceObjectId, right.sourceObjectId) || presentationLexicalCompare(left.recordId, right.recordId));
+    issueIf(canonicalPresentationValue(value.freshnessSummary) !== canonicalPresentationValue(canonical), issues, "freshnessSummary must use canonical source/record ordering");
+  }
+  requireArray(value, "conflicts", issues);
+  if (Array.isArray(value.conflicts)) {
+    value.conflicts.forEach((item, index) => captureNestedIssues(`conflicts[${index}]`, validateConflictDisplayRecord, item, issues));
+    const canonical = [...value.conflicts].sort((left, right) => presentationLexicalCompare(left.sourceObjectIds?.join("|") ?? "", right.sourceObjectIds?.join("|") ?? "") || presentationLexicalCompare(left.conflictId, right.conflictId));
+    issueIf(canonicalPresentationValue(value.conflicts) !== canonicalPresentationValue(canonical), issues, "conflicts must use canonical source/identity ordering");
+  }
+  requireArray(value, "warnings", issues);
+  if (Array.isArray(value.warnings)) {
+    value.warnings.forEach((item, index) => captureNestedIssues(`warnings[${index}]`, validateWarningDisplayRecord, item, issues));
+    const canonical = [...value.warnings].sort((left, right) => presentationLexicalCompare(left.sourceObjectId, right.sourceObjectId) || presentationLexicalCompare(left.warningId, right.warningId));
+    issueIf(canonicalPresentationValue(value.warnings) !== canonicalPresentationValue(canonical), issues, "warnings must use canonical source/identity ordering");
+  }
+  validateCanonicalStringArray(value, "sourceObjectIds", issues);
+  captureNestedIssues("projectionMeta", validateProjectionMeta, value.projectionMeta, issues);
+  if (isRecord(value.projectionMeta)) {
+    issueIf(value.projectionMeta.generatedAt !== value.generatedAt, issues, "projectionMeta.generatedAt must equal generatedAt");
+  }
+  if (Array.isArray(value.sourceObjectIds) && isRecord(value.projectionMeta)) {
+    const expectedId = cockpitProjectionId({ projectionVersion: value.projectionMeta.projectionVersion, generatedAt: value.generatedAt, sourceObjectIds: value.sourceObjectIds });
+    issueIf(value.projectionId !== expectedId, issues, "projectionId must match projection version, generatedAt, and canonical sourceObjectIds");
+    for (const item of projectionNestedObjects(value)) {
+      const identity = objectIdentity(item);
+      if (identity) issueIf(!value.sourceObjectIds.includes(identity), issues, `sourceObjectIds must include ${identity}`);
+    }
+  }
+  for (const item of value.freshnessSummary ?? []) issueIf(!value.sourceObjectIds?.includes(item.sourceObjectId), issues, `freshness source ${item.sourceObjectId} must be inventoried`);
+  for (const item of value.conflicts ?? []) for (const sourceId of item.sourceObjectIds ?? []) issueIf(!value.sourceObjectIds?.includes(sourceId), issues, `conflict source ${sourceId} must be inventoried`);
+  for (const item of value.warnings ?? []) issueIf(!value.sourceObjectIds?.includes(item.sourceObjectId), issues, `warning source ${item.sourceObjectId} must be inventoried`);
+  for (const forbidden of ["targetPrice", "positionSize", "orderType", "brokerAction", "openingProbability", "baseProbability", "bullProbability", "bearProbability", "productionCompositeOverride"]) {
+    issueIf(Object.hasOwn(value, forbidden), issues, `forbidden presentation field: ${forbidden}`);
+  }
+}
+
 function validateDiscoveryCandidate(value, issues) {
   validateBase(value, issues);
   if (!isRecord(value)) return;
@@ -700,6 +960,16 @@ function validateMarketContextBundle(value, issues) {
 
 const validators = {
   EngineMeta: (value, issues) => validateEngineMetaFields(value, issues),
+  ProjectionMeta: validateProjectionMeta,
+  FreshnessDisplayRecord: validateFreshnessDisplayRecord,
+  ConflictDisplayRecord: validateConflictDisplayRecord,
+  WarningDisplayRecord: validateWarningDisplayRecord,
+  CockpitMarketView: validateCockpitMarketView,
+  CockpitPremarketView: validateCockpitPremarketView,
+  CockpitGlobalCapitalView: validateCockpitGlobalCapitalView,
+  CockpitDiscoveryView: validateCockpitDiscoveryView,
+  CockpitDisplayEvidence: validateCockpitDisplayEvidence,
+  CockpitProjection: validateCockpitProjection,
   MarketSessionBoundary: validateMarketSessionBoundary,
   FuturesSnapshot: validateFuturesSnapshot,
   PremarketStockSnapshot: validatePremarketStockSnapshot,

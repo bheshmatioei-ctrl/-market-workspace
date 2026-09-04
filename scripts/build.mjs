@@ -19,7 +19,7 @@ async function filesRecursively(directory) {
 }
 
 const htmlSource = await readFile(path.join(repositoryRoot, "decision-cockpit.html"), "utf8");
-const requiredLabels = ["LIVE MARKET", "PREMARKET", "GLOBAL FLOW", "MODEL TEST"];
+const requiredLabels = ["LIVE MARKET", "PREMARKET", "GLOBAL CAPITAL", "US ASSET FLOWS", "MODEL TEST"];
 for (const label of requiredLabels) {
   if (!htmlSource.includes(label)) throw new Error(`Static shell is missing required navigation label: ${label}`);
 }
@@ -43,4 +43,3 @@ await writeFile(path.join(outputRoot, "index.html"), htmlSource, "utf8");
 await cp(sourceRoot, path.join(outputRoot, "src", "decision-cockpit"), { recursive: true });
 
 console.log(`Static Decision Cockpit build PASS: ${path.relative(repositoryRoot, outputRoot)}`);
-

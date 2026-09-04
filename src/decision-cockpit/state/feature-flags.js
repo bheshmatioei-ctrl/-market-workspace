@@ -1,4 +1,4 @@
-import { FeatureLifecycle } from "../domain/constants.js";
+import { CockpitDisplayMode, FeatureLifecycle } from "../domain/constants.js";
 import { validateFeatureLifecycle } from "../contracts/validators.js";
 
 export const DEFAULT_FEATURE_FLAGS = Object.freeze({
@@ -9,6 +9,7 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   usAssetFlowMonitor: FeatureLifecycle.SHADOW,
   premarketIntelligence: FeatureLifecycle.SHADOW,
   anomalyRadar: FeatureLifecycle.SHADOW,
+  cockpitProjection: FeatureLifecycle.SHADOW,
   stockDecisionEngine: FeatureLifecycle.OFF,
   tradeDecisionZones: FeatureLifecycle.OFF,
   modelTestLab: FeatureLifecycle.SHADOW,
@@ -42,11 +43,15 @@ export class FeatureFlagRegistry {
     return [FeatureLifecycle.BETA, FeatureLifecycle.ACTIVE].includes(this.get(name));
   }
 
+  canRenderForValidation(name, displayMode) {
+    return this.canCompute(name) && displayMode === CockpitDisplayMode.VALIDATION_ONLY;
+  }
+
   canInfluenceComposite(name) {
     return this.get(name) === FeatureLifecycle.ACTIVE;
   }
 
   snapshot() {
-    return Object.freeze(Object.fromEntries([...this.#flags.entries()].sort(([left], [right]) => left.localeCompare(right))));
+    return Object.freeze(Object.fromEntries([...this.#flags.entries()].sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)));
   }
 }

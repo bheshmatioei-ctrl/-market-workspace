@@ -78,6 +78,19 @@
  * @typedef {{schemaVersion:string, snapshotId:string, timestamp:string, sessionIdentity:SessionIdentity, symbol:string, priorClose:Measurement, premarketPrice:Measurement, gapPct:Measurement, premarketVolume:Measurement, relativePremarketVolume:Measurement, dollarVolume:Measurement, sectorId:string|null, catalystEventIds:string[], liquidityQuality:LiquidityQuality, freshness:FreshnessAssessment, evidenceRefs:EvidenceRef[]}} PremarketStockSnapshot
  * @typedef {{schemaVersion:string, assessmentId:string, timestamp:string, window:PremarketWindow, state:"GREEN"|"ORANGE"|"RED"|"GREY", direction:"IMPROVING"|"STABLE"|"DETERIORATING"|"UNKNOWN", confidence:Confidence, freshness:FreshnessAssessment, supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], sourceSnapshotIds:string[], engineMeta:EngineMeta}} PremarketWindowAssessment
  * @typedef {{sessionIdentity:SessionIdentity, windowAssessments:PremarketWindowAssessment[], supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], sourceSnapshotIds:string[], regularOpenTimestamp:string, freezeStatus:PremarketFreezeStatus, frozenAt:string|null, engineMeta:EngineMeta}} PremarketSnapshotPackage004Extension
+ *
+ * Package 005 additive deterministic presentation contracts:
+ * @typedef {"VALIDATION_ONLY"} CockpitDisplayMode
+ * @typedef {{recordId:string, sourceObjectId:string, status:"LIVE"|"DELAYED"|"DEGRADED"|"STALE"|"UNAVAILABLE", assessedAt:string, ageSeconds:number|null, decisionGrade:boolean, reason:string}} FreshnessDisplayRecord
+ * @typedef {{conflictId:string, sourceObjectIds:string[], label:"CONFLICT", description:string, supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[]}} ConflictDisplayRecord
+ * @typedef {{warningId:string, sourceObjectId:string, message:string, sourceField:string}} WarningDisplayRecord
+ * @typedef {{projectionVersion:"0.5.0", deterministic:true, generatedAt:string, sourceEngineVersions:string[], sourceRuleProfiles:string[], lifecycleDisplayMode:"VALIDATION_ONLY"}} ProjectionMeta
+ * @typedef {{regime:Object|null, directions:DirectionAssessment[], flow:FlowAssessment[], assetFlow:FlowAssessment[], alerts:Object[]}} CockpitMarketView
+ * @typedef {{snapshot:Object|null, windows:PremarketWindowAssessment[]}} CockpitPremarketView
+ * @typedef {{assessments:GlobalRotationAssessment[]}} CockpitGlobalCapitalView
+ * @typedef {{candidates:DiscoveryCandidate[], myFocusStatus:"ANALYSIS_ENGINE_NOT_AUTHORIZED"}} CockpitDiscoveryView
+ * @typedef {{marketSnapshots:Object[], breadthSnapshots:Object[], sectorSnapshots:Object[], stockSnapshots:Object[], assetFlowSnapshots:Object[], futuresSnapshots:FuturesSnapshot[], premarketStockSnapshots:PremarketStockSnapshot[], catalystEvents:Object[]}} CockpitDisplayEvidence
+ * @typedef {{schemaVersion:string, projectionId:string, generatedAt:string, displayMode:CockpitDisplayMode, market:CockpitMarketView, premarket:CockpitPremarketView, globalCapital:CockpitGlobalCapitalView, discovery:CockpitDiscoveryView, displayEvidence?:CockpitDisplayEvidence, freshnessSummary:FreshnessDisplayRecord[], conflicts:ConflictDisplayRecord[], warnings:WarningDisplayRecord[], sourceObjectIds:string[], projectionMeta:ProjectionMeta}} CockpitProjection
  */
 
 export {};

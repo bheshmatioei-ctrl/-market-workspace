@@ -111,6 +111,21 @@ export const ParticipationProxyState = Object.freeze({
   INSUFFICIENT: "INSUFFICIENT",
 });
 
+export const CockpitDisplayMode = Object.freeze({
+  VALIDATION_ONLY: "VALIDATION_ONLY",
+});
+
+export const CockpitSection = Object.freeze({
+  LIVE_MARKET: "LIVE_MARKET",
+  PREMARKET: "PREMARKET",
+  GLOBAL_CAPITAL: "GLOBAL_CAPITAL",
+  US_ASSET_FLOWS: "US_ASSET_FLOWS",
+});
+
+export const MyFocusStatus = Object.freeze({
+  ANALYSIS_ENGINE_NOT_AUTHORIZED: "ANALYSIS_ENGINE_NOT_AUTHORIZED",
+});
+
 export const AnomalyType = Object.freeze({
   RELATIVE_VOLUME_SPIKE: "RELATIVE_VOLUME_SPIKE",
   ABNORMAL_DOLLAR_VOLUME: "ABNORMAL_DOLLAR_VOLUME",

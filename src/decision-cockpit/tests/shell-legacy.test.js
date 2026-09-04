@@ -9,11 +9,13 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 test("mock cockpit shell contains required navigation and panels without network data", async () => {
   const html = await readFile(path.join(repositoryRoot, "decision-cockpit.html"), "utf8");
   const renderer = await readFile(path.join(repositoryRoot, "src/decision-cockpit/ui/render-shell.js"), "utf8");
-  const fixtures = await readFile(path.join(repositoryRoot, "src/decision-cockpit/mocks/fixtures.js"), "utf8");
-  const shellSource = html + renderer + fixtures;
-  for (const label of ["LIVE MARKET", "PREMARKET", "GLOBAL FLOW", "MODEL TEST"]) assert.match(html, new RegExp(label));
-  for (const panel of ["Market State", "Market Direction", "US Asset Flow", "Global Capital Rotation summary", "Money Flow", "Live Alerts", "My Focus", "AI Discovered", "Market Internals", "Macro / Risk", "Decision Timeline"]) assert.ok(shellSource.includes(panel), `missing ${panel}`);
-  assert.match(shellSource, /MOCK/);
+  const presentation = await readFile(path.join(repositoryRoot, "src/decision-cockpit/ui/render-projection.js"), "utf8");
+  const scenarios = await readFile(path.join(repositoryRoot, "src/decision-cockpit/mocks/cockpit-projection-scenarios.js"), "utf8");
+  const shellSource = html + renderer + presentation + scenarios;
+  for (const label of ["LIVE MARKET", "PREMARKET", "GLOBAL CAPITAL", "US ASSET FLOWS", "MODEL TEST"]) assert.match(html, new RegExp(label));
+  for (const panel of ["Market Regime", "Market Direction", "Money Flow", "Alerts", "MY FOCUS", "AI Discovered", "Market Internals", "Session Windows", "DIRECT / MEASURED", "PROXY / INFERRED"]) assert.ok(shellSource.includes(panel), `missing ${panel}`);
+  for (const label of ["VALIDATION MODE", "SHADOW DATA", "NOT LIVE", "NOT PRODUCTION DECISION"]) assert.ok(shellSource.includes(label), `missing ${label}`);
+  assert.match(shellSource, /MOCK \/ TEST DATA ONLY/);
   assert.doesNotMatch(shellSource, /https?:\/\//i);
   assert.doesNotMatch(renderer, /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(/);
 });
