@@ -66,6 +66,18 @@
  * Package 003 additive anomaly-discovery contract:
  * @typedef {"RELATIVE_VOLUME_SPIKE"|"ABNORMAL_DOLLAR_VOLUME"|"GAP_UP"|"GAP_DOWN"|"VWAP_RECLAIM"|"VWAP_BREAKDOWN"|"BREAKOUT"|"BREAKDOWN"|"RELATIVE_STRENGTH_ACCELERATION"|"RELATIVE_STRENGTH_DETERIORATION"|"SECTOR_CONFIRMATION"|"SECTOR_DIVERGENCE"|"PRICE_VOLUME_DIVERGENCE"|"CATALYST_ASSOCIATED_ANOMALY"} AnomalyType
  * @typedef {{schemaVersion:string, candidateId:string, timestamp:string, symbol:string, anomalyTypes:AnomalyType[], severity:"info"|"watch"|"warning"|"critical", confidence:Confidence, supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], catalystEventIds:string[], sectorId:string|null, sourceSnapshotIds:string[], freshness:FreshnessAssessment, engineMeta:EngineMeta}} DiscoveryCandidate
+ *
+ * Package 004 additive premarket-session contracts:
+ * @typedef {"AFTERHOURS"|"OVERNIGHT"|"PREMARKET"} PremarketWindow
+ * @typedef {"ES"|"NQ"|"RTY"} FuturesInstrument
+ * @typedef {"HIGH"|"MEDIUM"|"LOW"|"INSUFFICIENT"} LiquidityQuality
+ * @typedef {"LIVE"|"FROZEN"} PremarketFreezeStatus
+ * @typedef {"LOW"|"MEDIUM"|"HIGH"|"CRITICAL"} CatalystImpactTier
+ * @typedef {{schemaVersion:string, sessionDate:string, sessionCalendarId:string, priorRegularCloseTimestamp:string, afterhoursEndTimestamp:string, premarketStartTimestamp:string, regularOpenTimestamp:string, evidenceRefs:EvidenceRef[]}} MarketSessionBoundary
+ * @typedef {{schemaVersion:string, snapshotId:string, timestamp:string, sessionIdentity:SessionIdentity, instrument:FuturesInstrument, lastPrice:Measurement, priorCashClose:Measurement, changePctFromPriorCashClose:Measurement, volume:Measurement, freshness:FreshnessAssessment, evidenceRefs:EvidenceRef[]}} FuturesSnapshot
+ * @typedef {{schemaVersion:string, snapshotId:string, timestamp:string, sessionIdentity:SessionIdentity, symbol:string, priorClose:Measurement, premarketPrice:Measurement, gapPct:Measurement, premarketVolume:Measurement, relativePremarketVolume:Measurement, dollarVolume:Measurement, sectorId:string|null, catalystEventIds:string[], liquidityQuality:LiquidityQuality, freshness:FreshnessAssessment, evidenceRefs:EvidenceRef[]}} PremarketStockSnapshot
+ * @typedef {{schemaVersion:string, assessmentId:string, timestamp:string, window:PremarketWindow, state:"GREEN"|"ORANGE"|"RED"|"GREY", direction:"IMPROVING"|"STABLE"|"DETERIORATING"|"UNKNOWN", confidence:Confidence, freshness:FreshnessAssessment, supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], sourceSnapshotIds:string[], engineMeta:EngineMeta}} PremarketWindowAssessment
+ * @typedef {{sessionIdentity:SessionIdentity, windowAssessments:PremarketWindowAssessment[], supportingEvidence:EvidenceRef[], opposingEvidence:EvidenceRef[], sourceSnapshotIds:string[], regularOpenTimestamp:string, freezeStatus:PremarketFreezeStatus, frozenAt:string|null, engineMeta:EngineMeta}} PremarketSnapshotPackage004Extension
  */
 
 export {};

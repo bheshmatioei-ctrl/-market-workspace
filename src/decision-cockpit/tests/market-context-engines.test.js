@@ -38,9 +38,9 @@ test("all 12 required scenarios are explicitly MOCK / NOT LIVE", () => {
 });
 
 test("rule profiles are versioned, described, EXPERIMENTAL and SHADOW", () => {
-  assert.equal(RULE_PROFILES.length, 7);
+  assert.equal(RULE_PROFILES.length, 8);
   RULE_PROFILES.forEach((profile) => {
-    assert.match(profile.version, /^0\.[23]\.0$/);
+    assert.match(profile.version, /^0\.[234]\.0$/);
     assert.ok(profile.description.length > 20);
     assert.equal(profile.status, "EXPERIMENTAL");
     assert.equal(profile.lifecycle, FeatureLifecycle.SHADOW);

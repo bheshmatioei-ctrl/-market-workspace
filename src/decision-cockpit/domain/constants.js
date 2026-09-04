@@ -71,6 +71,46 @@ export const SessionPhase = Object.freeze({
   OVERNIGHT: "overnight",
 });
 
+export const PremarketWindow = Object.freeze({
+  AFTERHOURS: "AFTERHOURS",
+  OVERNIGHT: "OVERNIGHT",
+  PREMARKET: "PREMARKET",
+});
+
+export const FuturesInstrument = Object.freeze({
+  ES: "ES",
+  NQ: "NQ",
+  RTY: "RTY",
+});
+
+export const LiquidityQuality = Object.freeze({
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  LOW: "LOW",
+  INSUFFICIENT: "INSUFFICIENT",
+});
+
+export const PremarketFreezeStatus = Object.freeze({
+  LIVE: "LIVE",
+  FROZEN: "FROZEN",
+});
+
+export const CatalystImpactTier = Object.freeze({
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+});
+
+export const ParticipationProxyState = Object.freeze({
+  BROAD_DEMAND_PROXY: "BROAD_DEMAND_PROXY",
+  BROAD_SELLING_PRESSURE_PROXY: "BROAD_SELLING_PRESSURE_PROXY",
+  CONCENTRATED_DEMAND: "CONCENTRATED_DEMAND",
+  CONCENTRATED_SELLING: "CONCENTRATED_SELLING",
+  MIXED: "MIXED",
+  INSUFFICIENT: "INSUFFICIENT",
+});
+
 export const AnomalyType = Object.freeze({
   RELATIVE_VOLUME_SPIKE: "RELATIVE_VOLUME_SPIKE",
   ABNORMAL_DOLLAR_VOLUME: "ABNORMAL_DOLLAR_VOLUME",

@@ -1,18 +1,28 @@
 import {
   AnomalyType,
   AssessmentHorizon,
+  CatalystImpactTier,
   DirectionState,
   EvidenceType,
   FeatureLifecycle,
   FlowMode,
   FlowState,
   FreshnessStatus,
+  FuturesInstrument,
   GlobalRotationState,
+  LiquidityQuality,
+  PremarketFreezeStatus,
+  PremarketWindow,
   SessionPhase,
   TrafficLight,
   enumValues,
 } from "../domain/constants.js";
 import { ANOMALY_TYPE_ORDER, discoveryCandidateId } from "./anomaly-discovery.js";
+import {
+  PREMARKET_WINDOW_ORDER,
+  parsePremarketAssessmentId,
+  premarketSnapshotId,
+} from "./premarket-intelligence.js";
 
 const SOURCE_TYPES = ["official", "exchange", "regulator", "vendor", "aggregator", "derived"];
 const LATENCY_CLASSES = ["realtime", "delayed", "daily", "weekly", "monthly", "quarterly"];
@@ -28,6 +38,7 @@ export class ContractValidationError extends Error {
 }
 
 const isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+const lexicalCompare = (left, right) => left < right ? -1 : left > right ? 1 : 0;
 const isUtcTimestamp = (value) => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return false;
   return !Number.isNaN(Date.parse(value));
@@ -299,6 +310,8 @@ function validatePremarketSnapshot(value, issues) {
   requireEnum(value, "directionState", enumValues(DirectionState), issues);
   try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
   try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  const extensionFields = ["sessionIdentity", "windowAssessments", "supportingEvidence", "opposingEvidence", "sourceSnapshotIds", "regularOpenTimestamp", "freezeStatus", "frozenAt", "engineMeta"];
+  if (extensionFields.some((field) => value[field] !== undefined)) validatePremarketSnapshotExtension(value, issues);
 }
 
 function validateCatalystEvent(value, issues) {
@@ -312,6 +325,7 @@ function validateCatalystEvent(value, issues) {
   try { validateSourceMeta(value.sourceMeta); } catch (error) { issues.push(...error.issues.map((entry) => `sourceMeta.${entry}`)); }
   ["headline", "summary", "factualImpact"].forEach((field) => requireString(value, field, issues));
   ["affectedSymbols", "affectedSectors"].forEach((field) => requireArray(value, field, issues));
+  if (value.impactTier !== undefined) requireEnum(value, "impactTier", enumValues(CatalystImpactTier), issues);
   try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
 }
 
@@ -333,7 +347,7 @@ function validateCanonicalStringArray(value, field, issues, { nonEmpty = false }
   value[field].forEach((item, index) => issueIf(typeof item !== "string" || item.length === 0, issues, `${field}[${index}] must be a non-empty string`));
   if (nonEmpty) issueIf(value[field].length === 0, issues, `${field} must be non-empty`);
   if (value[field].every((item) => typeof item === "string")) {
-    const canonical = [...new Set(value[field])].sort((left, right) => left.localeCompare(right));
+    const canonical = [...new Set(value[field])].sort(lexicalCompare);
     issueIf(JSON.stringify(value[field]) !== JSON.stringify(canonical), issues, `${field} must be unique and canonically ordered`);
   }
 }
@@ -344,8 +358,134 @@ function validateCanonicalEvidenceArray(value, field, issues, { nonEmpty = false
   if (nonEmpty) issueIf(value[field].length === 0, issues, `${field} must be non-empty`);
   const ids = value[field].map((item) => item?.evidenceId);
   if (ids.every((item) => typeof item === "string")) {
-    const canonical = [...new Set(ids)].sort((left, right) => left.localeCompare(right));
+    const canonical = [...new Set(ids)].sort(lexicalCompare);
     issueIf(JSON.stringify(ids) !== JSON.stringify(canonical), issues, `${field} must be unique and ordered by evidenceId`);
+  }
+}
+
+function validateMarketSessionBoundary(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  issueIf(!isSessionDate(value.sessionDate), issues, "sessionDate must use YYYY-MM-DD");
+  requireString(value, "sessionCalendarId", issues);
+  const timestampFields = [
+    "priorRegularCloseTimestamp",
+    "afterhoursEndTimestamp",
+    "premarketStartTimestamp",
+    "regularOpenTimestamp",
+  ];
+  timestampFields.forEach((field) => requireUtc(value, field, issues));
+  validateCanonicalEvidenceArray(value, "evidenceRefs", issues, { nonEmpty: true });
+  if (timestampFields.every((field) => isUtcTimestamp(value[field]))) {
+    const [priorClose, afterhoursEnd, premarketStart, regularOpen] = timestampFields.map((field) => Date.parse(value[field]));
+    issueIf(!(priorClose < afterhoursEnd && afterhoursEnd <= premarketStart && premarketStart < regularOpen), issues,
+      "session timestamps must satisfy priorRegularCloseTimestamp < afterhoursEndTimestamp <= premarketStartTimestamp < regularOpenTimestamp");
+  }
+}
+
+function validateFuturesSnapshot(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  requireString(value, "snapshotId", issues);
+  requireUtc(value, "timestamp", issues);
+  validateSessionIdentityFields(value.sessionIdentity, issues);
+  requireEnum(value, "instrument", enumValues(FuturesInstrument), issues);
+  ["lastPrice", "priorCashClose", "changePctFromPriorCashClose", "volume"].forEach((field) => validateMeasurement(value, field, issues));
+  if (isRecord(value.lastPrice) && isRecord(value.priorCashClose)) {
+    issueIf(value.lastPrice.unit !== value.priorCashClose.unit, issues, "lastPrice and priorCashClose must use compatible units");
+  }
+  if (isRecord(value.changePctFromPriorCashClose)) issueIf(value.changePctFromPriorCashClose.unit !== "percent", issues, "changePctFromPriorCashClose.unit must be percent");
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  validateCanonicalEvidenceArray(value, "evidenceRefs", issues, { nonEmpty: true });
+}
+
+function validatePremarketStockSnapshot(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["snapshotId", "symbol"].forEach((field) => requireString(value, field, issues));
+  requireUtc(value, "timestamp", issues);
+  validateSessionIdentityFields(value.sessionIdentity, issues);
+  if (isRecord(value.sessionIdentity)) issueIf(value.sessionIdentity.sessionPhase !== SessionPhase.PREMARKET, issues, "PremarketStockSnapshot sessionPhase must be premarket");
+  ["priorClose", "premarketPrice", "gapPct", "premarketVolume", "relativePremarketVolume", "dollarVolume"].forEach((field) => validateMeasurement(value, field, issues));
+  if (isRecord(value.priorClose) && isRecord(value.premarketPrice)) issueIf(value.priorClose.unit !== value.premarketPrice.unit, issues, "priorClose and premarketPrice must use compatible units");
+  if (isRecord(value.gapPct)) issueIf(value.gapPct.unit !== "percent", issues, "gapPct.unit must be percent");
+  requireNullableString(value, "sectorId", issues);
+  validateCanonicalStringArray(value, "catalystEventIds", issues);
+  requireEnum(value, "liquidityQuality", enumValues(LiquidityQuality), issues);
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  validateCanonicalEvidenceArray(value, "evidenceRefs", issues, { nonEmpty: true });
+}
+
+function validatePremarketWindowAssessment(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  requireString(value, "assessmentId", issues);
+  requireUtc(value, "timestamp", issues);
+  requireEnum(value, "window", enumValues(PremarketWindow), issues);
+  requireEnum(value, "state", enumValues(TrafficLight), issues);
+  requireEnum(value, "direction", enumValues(DirectionState), issues);
+  try { validateConfidence(value.confidence); } catch (error) { issues.push(...error.issues.map((entry) => `confidence.${entry}`)); }
+  try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+  validateCanonicalEvidenceArray(value, "supportingEvidence", issues);
+  validateCanonicalEvidenceArray(value, "opposingEvidence", issues);
+  validateCanonicalStringArray(value, "sourceSnapshotIds", issues);
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (isRecord(value.engineMeta)) {
+    issueIf(value.engineMeta.lifecycle !== FeatureLifecycle.SHADOW, issues, "Package 004 PremarketWindowAssessment lifecycle must be SHADOW");
+    issueIf(value.timestamp !== value.engineMeta.evaluatedAt, issues, "timestamp must equal engineMeta.evaluatedAt");
+  }
+  const identity = parsePremarketAssessmentId(value.assessmentId);
+  issueIf(identity === null, issues, "assessmentId must use the approved deterministic identity format");
+  if (identity && isRecord(value.engineMeta)) {
+    issueIf(identity.engineVersion !== value.engineMeta.engineVersion, issues, "assessmentId engineVersion must match engineMeta");
+    issueIf(identity.ruleProfileId !== value.engineMeta.ruleProfileId, issues, "assessmentId ruleProfileId must match engineMeta");
+    issueIf(identity.evaluatedAt !== value.timestamp, issues, "assessmentId evaluatedAt must match timestamp");
+    issueIf(!isSessionDate(identity.sessionDate), issues, "assessmentId sessionDate must use YYYY-MM-DD");
+    issueIf(typeof identity.sessionCalendarId !== "string" || identity.sessionCalendarId.length === 0, issues, "assessmentId sessionCalendarId is required");
+    issueIf(identity.window !== value.window, issues, "assessmentId window must match window");
+  }
+  if (value.direction === DirectionState.UNKNOWN) issueIf(value.state !== TrafficLight.GREY, issues, "UNKNOWN direction requires GREY state");
+}
+
+function validatePremarketSnapshotExtension(value, issues) {
+  const requiredFields = ["sessionIdentity", "windowAssessments", "supportingEvidence", "opposingEvidence", "sourceSnapshotIds", "regularOpenTimestamp", "freezeStatus", "frozenAt", "engineMeta"];
+  requiredFields.forEach((field) => issueIf(value[field] === undefined, issues, `Package 004 extension field ${field} is required`));
+  validateSessionIdentityFields(value.sessionIdentity, issues);
+  if (isRecord(value.sessionIdentity)) issueIf(value.sessionDate !== value.sessionIdentity.sessionDate, issues, "sessionDate must match sessionIdentity.sessionDate");
+  requireArray(value, "windowAssessments", issues);
+  if (Array.isArray(value.windowAssessments)) {
+    value.windowAssessments.forEach((item, index) => captureNestedIssues(`windowAssessments[${index}]`, validatePremarketWindowAssessment, item, issues));
+    issueIf(JSON.stringify(value.windowAssessments.map((item) => item?.window)) !== JSON.stringify(PREMARKET_WINDOW_ORDER), issues,
+      "windowAssessments must contain AFTERHOURS, OVERNIGHT, PREMARKET in canonical order");
+  }
+  validateCanonicalEvidenceArray(value, "supportingEvidence", issues);
+  validateCanonicalEvidenceArray(value, "opposingEvidence", issues);
+  validateCanonicalStringArray(value, "sourceSnapshotIds", issues);
+  requireUtc(value, "regularOpenTimestamp", issues);
+  requireEnum(value, "freezeStatus", enumValues(PremarketFreezeStatus), issues);
+  requireUtc(value, "frozenAt", issues, { nullable: true });
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (isRecord(value.engineMeta)) {
+    issueIf(value.engineMeta.lifecycle !== FeatureLifecycle.SHADOW, issues, "Package 004 PremarketSnapshot lifecycle must be SHADOW");
+    issueIf(value.timestamp !== value.engineMeta.evaluatedAt, issues, "timestamp must equal engineMeta.evaluatedAt");
+    if (isRecord(value.sessionIdentity)) {
+      const expectedId = premarketSnapshotId({
+        engineVersion: value.engineMeta.engineVersion,
+        ruleProfileId: value.engineMeta.ruleProfileId,
+        evaluatedAt: value.timestamp,
+        sessionDate: value.sessionIdentity.sessionDate,
+        sessionCalendarId: value.sessionIdentity.sessionCalendarId,
+      });
+      issueIf(value.snapshotId !== expectedId, issues, "snapshotId must match the approved deterministic identity tuple");
+    }
+  }
+  if (value.freezeStatus === PremarketFreezeStatus.LIVE) {
+    issueIf(value.frozenAt !== null, issues, "LIVE PremarketSnapshot requires frozenAt=null");
+    if (isUtcTimestamp(value.timestamp) && isUtcTimestamp(value.regularOpenTimestamp)) issueIf(Date.parse(value.timestamp) >= Date.parse(value.regularOpenTimestamp), issues, "LIVE PremarketSnapshot timestamp must be before regularOpenTimestamp");
+  }
+  if (value.freezeStatus === PremarketFreezeStatus.FROZEN) {
+    issueIf(value.frozenAt !== value.regularOpenTimestamp, issues, "FROZEN PremarketSnapshot requires frozenAt=regularOpenTimestamp");
+    issueIf(value.timestamp !== value.regularOpenTimestamp, issues, "FROZEN PremarketSnapshot timestamp must equal regularOpenTimestamp");
   }
 }
 
@@ -560,6 +700,10 @@ function validateMarketContextBundle(value, issues) {
 
 const validators = {
   EngineMeta: (value, issues) => validateEngineMetaFields(value, issues),
+  MarketSessionBoundary: validateMarketSessionBoundary,
+  FuturesSnapshot: validateFuturesSnapshot,
+  PremarketStockSnapshot: validatePremarketStockSnapshot,
+  PremarketWindowAssessment: validatePremarketWindowAssessment,
   MarketSnapshot: validateMarketSnapshot,
   BreadthSnapshot: validateBreadthSnapshot,
   SectorSnapshot: validateSectorSnapshot,

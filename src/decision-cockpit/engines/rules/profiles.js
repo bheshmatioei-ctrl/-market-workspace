@@ -104,6 +104,24 @@ export const ANOMALY_RADAR_RULE_PROFILE = profile({
   severityByAnomalyCount: Object.freeze({ watch: 2, warning: 4, critical: 7 }),
 });
 
+export const PREMARKET_INTELLIGENCE_RULE_PROFILE = profile({
+  ruleProfileId: "premarket-intelligence.experimental.v0.4",
+  version: "0.4.0",
+  description: "Synthetic deterministic Package 004 premarket-session thresholds for SHADOW validation only; experimental, not production-calibrated, and not empirically validated.",
+  engineId: "premarket-intelligence-engine",
+  engineVersion: "0.4-shadow",
+  minimumFuturesEvidenceFamilies: 2,
+  futuresConflictMagnitude: 0.35,
+  participationMinimumFamilies: 2,
+  minimumLiquidityQuality: "MEDIUM",
+  pendingEventConfidencePenalty: 0.15,
+  highImpactEventWindowSeconds: 7_200,
+  maximumPremarketStockAgeSeconds: 1_800,
+  maximumFuturesAgeSeconds: 1_800,
+  maximumSectorAgeSeconds: 1_800,
+  minimumGlobalContextFamilies: 1,
+});
+
 export const RULE_PROFILES = Object.freeze([
   MARKET_REGIME_RULE_PROFILE,
   MARKET_DIRECTION_RULE_PROFILE,
@@ -112,6 +130,7 @@ export const RULE_PROFILES = Object.freeze([
   GLOBAL_ROTATION_RULE_PROFILE,
   BUNDLE_RULE_PROFILE,
   ANOMALY_RADAR_RULE_PROFILE,
+  PREMARKET_INTELLIGENCE_RULE_PROFILE,
 ]);
 
 export function assertExperimentalShadowProfile(ruleProfile) {
