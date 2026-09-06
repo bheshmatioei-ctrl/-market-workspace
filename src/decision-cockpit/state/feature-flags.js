@@ -10,7 +10,7 @@ export const DEFAULT_FEATURE_FLAGS = Object.freeze({
   premarketIntelligence: FeatureLifecycle.SHADOW,
   anomalyRadar: FeatureLifecycle.SHADOW,
   cockpitProjection: FeatureLifecycle.SHADOW,
-  stockDecisionEngine: FeatureLifecycle.OFF,
+  stockDecisionEngine: FeatureLifecycle.SHADOW,
   tradeDecisionZones: FeatureLifecycle.OFF,
   modelTestLab: FeatureLifecycle.SHADOW,
 });

@@ -91,6 +91,13 @@
  * @typedef {{candidates:DiscoveryCandidate[], myFocusStatus:"ANALYSIS_ENGINE_NOT_AUTHORIZED"}} CockpitDiscoveryView
  * @typedef {{marketSnapshots:Object[], breadthSnapshots:Object[], sectorSnapshots:Object[], stockSnapshots:Object[], assetFlowSnapshots:Object[], futuresSnapshots:FuturesSnapshot[], premarketStockSnapshots:PremarketStockSnapshot[], catalystEvents:Object[]}} CockpitDisplayEvidence
  * @typedef {{schemaVersion:string, projectionId:string, generatedAt:string, displayMode:CockpitDisplayMode, market:CockpitMarketView, premarket:CockpitPremarketView, globalCapital:CockpitGlobalCapitalView, discovery:CockpitDiscoveryView, displayEvidence?:CockpitDisplayEvidence, freshnessSummary:FreshnessDisplayRecord[], conflicts:ConflictDisplayRecord[], warnings:WarningDisplayRecord[], sourceObjectIds:string[], projectionMeta:ProjectionMeta}} CockpitProjection
+ *
+ * Package 006 additive deterministic stock-decision contracts:
+ * @typedef {"MY_FOCUS"|"AI_DISCOVERED_SELECTED"} StockAnalysisOrigin
+ * @typedef {{schemaVersion:string, subjectId:string, symbol:string, origin:StockAnalysisOrigin, selectedAt:string, discoveryCandidateId:string|null}} StockAnalysisSubject
+ * @typedef {{subjectId:string, symbol:string, origin:StockAnalysisOrigin, marketDecisionId:string, directionAssessmentIds:string[], sectorId:string|null, catalystEventIds:string[], sourceSnapshotIds:string[], engineMeta:EngineMeta}} StockDecisionContext
+ * @typedef {{stockDecisionContext?:StockDecisionContext}} DecisionStatePackage006Extension
+ * @typedef {{sessionIdentity?:SessionIdentity}} StockSnapshotPackage006Extension
  */
 
 export {};

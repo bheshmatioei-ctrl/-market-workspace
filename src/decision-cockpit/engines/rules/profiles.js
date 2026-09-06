@@ -122,6 +122,23 @@ export const PREMARKET_INTELLIGENCE_RULE_PROFILE = profile({
   minimumGlobalContextFamilies: 1,
 });
 
+export const STOCK_DECISION_RULE_PROFILE = profile({
+  ruleProfileId: "stock-decision.experimental.v0.6",
+  version: "0.6.0",
+  description: "SYNTHETIC, EXPERIMENTAL Package 006 stock-decision thresholds for SHADOW validation only; NOT PRODUCTION-CALIBRATED and NOT EMPIRICALLY VALIDATED.",
+  engineId: "stock-decision-engine",
+  engineVersion: "0.6-shadow",
+  minimumEvidenceFamilies: 3,
+  relativeVolumeParticipationThreshold: 1.5,
+  vwapDistanceThreshold: 0.1,
+  relativeStrengthThreshold: 0.3,
+  marketConflictPenalty: 0.18,
+  sectorConflictPenalty: 0.12,
+  lowFreshnessPenalty: 0.2,
+  pendingHighImpactEventWindowSeconds: 86_400,
+  eventRiskConfidenceCap: 0.55,
+});
+
 export const RULE_PROFILES = Object.freeze([
   MARKET_REGIME_RULE_PROFILE,
   MARKET_DIRECTION_RULE_PROFILE,
@@ -131,6 +148,7 @@ export const RULE_PROFILES = Object.freeze([
   BUNDLE_RULE_PROFILE,
   ANOMALY_RADAR_RULE_PROFILE,
   PREMARKET_INTELLIGENCE_RULE_PROFILE,
+  STOCK_DECISION_RULE_PROFILE,
 ]);
 
 export function assertExperimentalShadowProfile(ruleProfile) {

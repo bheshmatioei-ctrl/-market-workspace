@@ -16,6 +16,8 @@ import {
   PremarketFreezeStatus,
   PremarketWindow,
   SessionPhase,
+  StockAnalysisOrigin,
+  StockDecisionState,
   TrafficLight,
   enumValues,
 } from "../domain/constants.js";
@@ -39,6 +41,12 @@ import {
   parsePremarketAssessmentId,
   premarketSnapshotId,
 } from "./premarket-intelligence.js";
+import {
+  STOCK_DECISION_ENGINE_ID,
+  STOCK_DECISION_ENGINE_VERSION,
+  STOCK_DECISION_RULE_PROFILE_ID,
+  stockDecisionId,
+} from "./stock-decision-intelligence.js";
 
 const SOURCE_TYPES = ["official", "exchange", "regulator", "vendor", "aggregator", "derived"];
 const LATENCY_CLASSES = ["realtime", "delayed", "daily", "weekly", "monthly", "quarterly"];
@@ -281,12 +289,28 @@ function validateStockSnapshot(value, issues) {
   validateSnapshotBase(value, issues);
   if (!isRecord(value)) return;
   requireString(value, "symbol", issues);
+  validateOptionalSessionIdentity(value, issues);
   ["price", "priorClose", "changePct", "volume"].forEach((field) => validateMeasurement(value, field, issues));
   ["avgVolume", "relativeVolume", "dollarVolume", "vwap", "distanceFromVWAPPct", "dayHigh", "dayLow", "relativeStrengthVsBenchmark"].forEach((field) => {
     if (value[field] != null) validateMeasurement(value, field, issues);
   });
   requireArray(value, "newsEventIds", issues);
   try { validateFreshnessAssessment(value.freshness); } catch (error) { issues.push(...error.issues.map((entry) => `freshness.${entry}`)); }
+}
+
+function validateStockAnalysisSubject(value, issues) {
+  validateBase(value, issues);
+  if (!isRecord(value)) return;
+  ["subjectId", "symbol"].forEach((field) => requireString(value, field, issues));
+  requireEnum(value, "origin", enumValues(StockAnalysisOrigin), issues);
+  requireUtc(value, "selectedAt", issues);
+  requireNullableString(value, "discoveryCandidateId", issues);
+  if (value.origin === StockAnalysisOrigin.MY_FOCUS) {
+    issueIf(value.discoveryCandidateId !== null, issues, "MY_FOCUS requires discoveryCandidateId=null");
+  }
+  if (value.origin === StockAnalysisOrigin.AI_DISCOVERED_SELECTED) {
+    issueIf(typeof value.discoveryCandidateId !== "string" || value.discoveryCandidateId.length === 0, issues, "AI_DISCOVERED_SELECTED requires discoveryCandidateId");
+  }
 }
 
 function validateAssetFlowSnapshot(value, issues) {
@@ -807,7 +831,68 @@ function validateDecisionState(value, issues) {
   if (value.engineMeta !== undefined) {
     try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
   }
-  if (value.state === "UNKNOWN") issueIf(value.trafficLight !== TrafficLight.GREY, issues, "UNKNOWN decision state must be GREY");
+  if (value.stockDecisionContext !== undefined) captureNestedIssues("stockDecisionContext", validateStockDecisionContext, value.stockDecisionContext, issues);
+  const isPackage006 = value.engineMeta?.engineId === STOCK_DECISION_ENGINE_ID || value.stockDecisionContext?.engineMeta?.engineId === STOCK_DECISION_ENGINE_ID;
+  if (isPackage006) {
+    issueIf(value.scope !== "STOCK", issues, "Package 006 DecisionState scope must be STOCK");
+    issueIf(!enumValues(StockDecisionState).includes(value.state), issues, "Package 006 DecisionState has an unauthorized stock state");
+    issueIf(value.engineVersion !== STOCK_DECISION_ENGINE_VERSION, issues, "Package 006 engineVersion must be 0.6-shadow");
+    issueIf(value.timestamp !== value.engineMeta?.evaluatedAt, issues, "Package 006 timestamp must equal engineMeta.evaluatedAt");
+    issueIf(value.stockDecisionContext === undefined, issues, "Package 006 DecisionState requires stockDecisionContext");
+    if (isRecord(value.stockDecisionContext)) {
+      issueIf(value.scopeId !== value.stockDecisionContext.symbol, issues, "scopeId must equal stockDecisionContext.symbol");
+      issueIf(value.timestamp !== value.stockDecisionContext.engineMeta?.evaluatedAt, issues, "timestamp must equal stockDecisionContext.engineMeta.evaluatedAt");
+      issueIf(value.engineVersion !== value.stockDecisionContext.engineMeta?.engineVersion, issues, "engineVersion must match stockDecisionContext.engineMeta");
+      if (isRecord(value.engineMeta) && isRecord(value.stockDecisionContext.engineMeta)) {
+        for (const field of ["engineId", "engineVersion", "lifecycle", "evaluatedAt", "ruleProfileId", "deterministic"]) {
+          issueIf(value.engineMeta[field] !== value.stockDecisionContext.engineMeta[field], issues, `engineMeta.${field} must match stockDecisionContext.engineMeta`);
+        }
+      }
+      if ([value.engineVersion, value.engineMeta?.ruleProfileId, value.timestamp, value.stockDecisionContext.subjectId, value.scopeId].every((item) => typeof item === "string" && item.length > 0)) {
+        const expectedId = stockDecisionId({
+          engineVersion: value.engineVersion,
+          ruleProfileId: value.engineMeta.ruleProfileId,
+          evaluatedAt: value.timestamp,
+          subjectId: value.stockDecisionContext.subjectId,
+          symbol: value.scopeId,
+        });
+        issueIf(value.decisionId !== expectedId, issues, "decisionId must match the approved Package 006 deterministic identity tuple");
+      }
+    }
+    validateCanonicalEvidenceArray(value, "supportingEvidence", issues);
+    validateCanonicalEvidenceArray(value, "opposingEvidence", issues);
+    for (const forbidden of ["BUY", "SELL", "entryPrice", "exitPrice", "stopLoss", "targetPrice", "positionSize", "orderType", "brokerAction", "tradeDecisionZone", "predictionRecord"]) {
+      issueIf(Object.hasOwn(value, forbidden), issues, `forbidden Package 006 field: ${forbidden}`);
+    }
+  }
+  if (value.state === "UNKNOWN") {
+    issueIf(value.trafficLight !== TrafficLight.GREY, issues, "UNKNOWN decision state must be GREY");
+    if (isPackage006) issueIf(value.score !== null, issues, "Package 006 UNKNOWN decision state requires score=null");
+  }
+}
+
+function validateStockDecisionContext(value, issues) {
+  if (!isRecord(value)) {
+    issues.push("must be an object");
+    return;
+  }
+  ["subjectId", "symbol", "marketDecisionId"].forEach((field) => requireString(value, field, issues));
+  requireEnum(value, "origin", enumValues(StockAnalysisOrigin), issues);
+  requireNullableString(value, "sectorId", issues);
+  requireArray(value, "directionAssessmentIds", issues);
+  if (Array.isArray(value.directionAssessmentIds)) {
+    value.directionAssessmentIds.forEach((item, index) => issueIf(typeof item !== "string" || item.length === 0, issues, `directionAssessmentIds[${index}] must be a non-empty string`));
+    issueIf(new Set(value.directionAssessmentIds).size !== value.directionAssessmentIds.length, issues, "directionAssessmentIds must be unique");
+  }
+  validateCanonicalStringArray(value, "catalystEventIds", issues);
+  validateCanonicalStringArray(value, "sourceSnapshotIds", issues, { nonEmpty: true });
+  try { validateEngineMeta(value.engineMeta); } catch (error) { issues.push(...error.issues.map((entry) => `engineMeta.${entry}`)); }
+  if (isRecord(value.engineMeta)) {
+    issueIf(value.engineMeta.engineId !== STOCK_DECISION_ENGINE_ID, issues, "StockDecisionContext engineId must be stock-decision-engine");
+    issueIf(value.engineMeta.engineVersion !== STOCK_DECISION_ENGINE_VERSION, issues, "StockDecisionContext engineVersion must be 0.6-shadow");
+    issueIf(value.engineMeta.ruleProfileId !== STOCK_DECISION_RULE_PROFILE_ID, issues, "StockDecisionContext ruleProfileId must be stock-decision.experimental.v0.6");
+    issueIf(value.engineMeta.lifecycle !== FeatureLifecycle.SHADOW, issues, "Package 006 lifecycle must be SHADOW");
+  }
 }
 
 function validateTradeDecisionZone(value, issues) {
@@ -978,6 +1063,8 @@ const validators = {
   BreadthSnapshot: validateBreadthSnapshot,
   SectorSnapshot: validateSectorSnapshot,
   StockSnapshot: validateStockSnapshot,
+  StockAnalysisSubject: validateStockAnalysisSubject,
+  StockDecisionContext: validateStockDecisionContext,
   AssetFlowSnapshot: validateAssetFlowSnapshot,
   CountryFlowSnapshot: validateCountryFlowSnapshot,
   PremarketSnapshot: validatePremarketSnapshot,
