@@ -1,0 +1,1 @@
+export default function handler(req,res){res.status(200).json({ok:true,service:"market-catalyst-radar-v2",version:"0.3.0",time:new Date().toISOString()});}
