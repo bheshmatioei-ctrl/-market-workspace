@@ -1,0 +1,27 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>رادار هفتگی بازار V0.3</title><style>
+:root{font-family:system-ui,sans-serif;color-scheme:dark}body{margin:0;background:#071224;color:#edf4ff}.wrap{max-width:1100px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center}.tag{font-size:12px;color:#64b5ff}.card{background:#10213b;border:1px solid #29486f;border-radius:18px;padding:18px;margin-top:16px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.metric{background:#0b192d;border-radius:12px;padding:12px}.label{color:#9eb2cd;font-size:12px}.value{font-size:22px;margin-top:6px}.ok{color:#73e2a7}.warn{color:#f5c76a}.bad{color:#ff8f8f}button{background:#2387e8;color:white;border:0;border-radius:10px;padding:11px 15px;font-weight:700}.small{font-size:13px;color:#a8bad1;line-height:1.8}@media(max-width:700px){.grid{grid-template-columns:repeat(2,1fr)}.top{align-items:flex-start;flex-direction:column}}</style></head><body><main class="wrap">
+<div class="top"><div><div class="tag">MARKET CATALYST RADAR · V0.3</div><h1>رادار هفتگی بازار</h1><div class="small">نسخهٔ آنلاین‌محور — دادهٔ ساختگی ممنوع</div></div><button id="refresh">بررسی دادهٔ رسمی</button></div>
+<section class="card"><h2>وضعیت سامانه</h2><div id="status" class="warn">در انتظار بررسی</div><div id="checked" class="small"></div></section>
+<section class="card"><h2>CPI آمریکا</h2><div class="grid"><div class="metric"><div class="label">Actual</div><div id="actual" class="value">—</div></div><div class="metric"><div class="label">Forecast</div><div class="value">—</div></div><div class="metric"><div class="label">Previous</div><div id="previous" class="value">—</div></div><div class="metric"><div class="label">Surprise</div><div class="value">—</div></div></div><p id="summary" class="small">تا دریافت دادهٔ معتبر، هیچ نتیجه‌ای نمایش داده نمی‌شود.</p><div class="small">منبع داده: BLS Public Data API v2 · Series CUUR0000SA0</div></section>
+<section class="card"><h2>چرخهٔ گزارش</h2><div class="small">Scheduled → Released → Verified → Actual/Forecast/Previous/Revised → Surprise → چکیدهٔ فارسی → تفسیر بازار</div></section>
+</main><script>
+const $=id=>document.getElementById(id);
+async function refresh(){
+ $("status").textContent="در حال بررسی…"; $("status").className="warn";
+ try{
+  const r=await fetch("./api/bls?series=CUUR0000SA0",{cache:"no-store"}); const j=await r.json();
+  $("checked").textContent="آخرین بررسی: "+new Date(j.checkedAt||Date.now()).toLocaleString("fa-IR");
+  if(!r.ok||!j.ok) throw new Error(j.error||"provider_error");
+  const rows=(j.data||[]).filter(x=>x.period!=="M13");
+  if(!rows.length) throw new Error("empty_data");
+  $("actual").textContent=rows[0].value;
+  $("previous").textContent=rows[1]?.value||"—";
+  $("status").textContent="BLS پاسخ معتبر داد"; $("status").className="ok";
+  $("summary").textContent="دادهٔ رسمی دریافت شد. این مقدار فعلاً سطح شاخص CPI است؛ نرخ سالانه و Surprise فقط پس از تکمیل تبدیل و دادهٔ Forecast نمایش داده می‌شود.";
+ }catch(e){
+  $("status").textContent="دادهٔ رسمی در دسترس نیست"; $("status").className="bad";
+  $("summary").textContent="به‌علت خطای منبع یا اتصال، عدد جایگزین یا ساختگی نمایش داده نمی‌شود.";
+ }
+}
+$("refresh").addEventListener("click",refresh);
+</script></body></html>
