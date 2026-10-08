@@ -1,0 +1,7 @@
+{
+  "name":"market-catalyst-radar-v2",
+  "version":"0.3.0",
+  "private":true,
+  "scripts":{"dev":"vercel dev"},
+  "devDependencies":{"vercel":"latest"}
+}
