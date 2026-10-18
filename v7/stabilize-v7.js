@@ -63,7 +63,6 @@
         <div class="researchHero"><div><div class="researchKicker">PREPARED RESEARCH CONTEXT</div><h2>${esc(t)} · ${esc(company)}</h2></div><span class="sourceBadge">LOCAL ONLY</span></div>
         <textarea id="researchPrompt" class="noteArea researchPrompt">${esc(contextPrompt())}</textarea>
         <div class="researchActions"><button class="btn primary" id="copyResearchPrompt">Copy prompt</button><button class="btn" data-go="notebook">Open Notebook</button><button class="btn" id="researchCaptureBtn">Capture</button></div>
-        <div class="researchBlock"><div class="researchBlockHead"><b>ChatGPT inline connection</b><span class="small">Not connected</span></div><div class="researchNotePreview">The panel is intentionally keeping a dedicated ChatGPT integration slot. It will only be enabled when a secure backend is available; no fake connection is shown.</div></div>
       </div>`;
     }
 
@@ -87,7 +86,6 @@
       <div class="researchBlock"><div class="researchBlockHead"><b>Latest capture</b><button class="btn" id="researchCaptureBtn">Capture</button></div>${captureSummary()}</div>
       <div class="researchBlock"><div class="researchBlockHead"><b>Quick workflow</b></div><div class="researchActions"><button class="btn" data-go="market">Market</button><button class="btn" data-go="news">News</button><button class="btn" data-go="notebook">Notebook</button><button class="btn primary" id="goPromptTab">Prepare prompt</button></div></div>
       <div class="researchBlock"><div class="researchBlockHead"><b>Notebook</b><span class="small">${(S.notes || '').trim() ? 'Research note available' : 'No note yet'}</span></div><div class="researchNotePreview">${esc((S.notes || '').trim().slice(0, 420) || 'Write a note in Notebook or the Notes tab.')}</div></div>
-      <div class="researchBlock"><div class="researchBlockHead"><b>ChatGPT inline</b><span class="small">Reserved · not connected</span></div><div class="researchNotePreview">This area is reserved for a real in-workspace ChatGPT connection. It stays visible in the architecture so Capture, Notes, ticker and source context can be sent there later without redesigning the workspace.</div></div>
     </div>`;
   };
 
